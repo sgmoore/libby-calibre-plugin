@@ -131,8 +131,8 @@ class LibbyClient(object):
         self.identity_token = identity_token
         self.max_retries = max_retries
         self.user_agent = kwargs.pop("user_agent", USER_AGENT)
-        self.api_base = "https://sentry-read.svc.overdrive.com/"
-        self.tags_api_base = "https://vandal.svc.overdrive.com/"
+        self.api_base = "https://sentry.libbyapp.com/"
+        self.tags_api_base = "https://vandal.libbyapp.com/"
 
         cookie_jar = CookieJar()
         handlers = [
