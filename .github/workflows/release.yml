@@ -8,8 +8,12 @@ on:
 jobs:
   tag-zip:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      repository-projects: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
           fetch-depth: 1
@@ -19,11 +23,22 @@ jobs:
         run: |
           cd .github/workflows
           sh build_translations.sh
-      - name: Upload plugin
-        uses: actions/upload-artifact@v3
-        with:
-          name: overdrive-libby-plugin-${{ github.ref_name }}
-          path: |
-            calibre-plugin/
-            !calibre-plugin/translations/*.po
-            !calibre-plugin/translations/*.pot
+      
+#      - name: Upload plugin
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: overdrive-libby-plugin-${{ github.ref_name }}
+#          path: |
+#            calibre-plugin/
+#            !calibre-plugin/translations/*.po
+#            !calibre-plugin/translations/*.pot
+
+      - name: Release plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |         
+          cd calibre-plugin
+          zip -r overdrive-libby-plugin-${{ github.ref_name }}.zip * -x translations/*.po -x translations/*.pot
+          gh release create ${{ github.ref_name }}   overdrive-libby-plugin-${{ github.ref_name }}.zip -t  "Release ${{ github.ref_name }}" --notes-from-tag
+      
+     

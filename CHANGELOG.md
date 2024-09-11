@@ -1,6 +1,11 @@
 # Changelog
 
-Unreleased
+Version 0.1.9a - 2024-09-11 Unoffical version 
+- Fix: Uses libbyapp.com domain rather than svc.overdrive.com which fixes https://github.com/ping/libby-calibre-plugin/issues/33
+- Fix: Applied spicefather's fix for date time formats (see https://github.com/ping/libby-calibre-plugin/pull/17) 
+
+Also includes unreleased changes by ping including the following
+
 - New: Rename a card
 - Fix: Use a regex validator instead of input mask for Libby setup code due to wonkiness, ref #14
 
