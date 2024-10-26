@@ -25,7 +25,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
-from .errors import ClientConnectionError, ErrorHandler
+from .errors import ClientConnectionError, ErrorHandler, ClientForbiddenError
 from .utils import StringEnum
 
 
@@ -430,7 +430,7 @@ class LibbyClient(object):
             self.logger.debug("RES BODY: %s", decoded_res)
         return decoded_res
 
-    def send_request(
+    def _send_request(
         self,
         endpoint: str,
         query: Optional[Dict] = None,
@@ -581,6 +581,26 @@ class LibbyClient(object):
                 return res_obj
 
             return response_content
+
+    def send_request(
+        self,
+        *args,
+        **kwargs,
+    ):
+        """
+        Calls the private Libby api, reauthenticating if necessary.
+
+        See _send_request for parameter and return documentation.
+        """
+
+        try:
+            return self._send_request(*args, **kwargs)
+        except ClientForbiddenError as auth_error:
+            self.logger.warning("Encountered auth error %s, getting updated chip...", auth_error)
+            self.get_chip(update_internal_token=True, authenticated=True)
+            self.logger.warning("Re-sending request with updated chip...")
+            return self._send_request(*args, **kwargs)
+
 
     def get_chip(
         self, update_internal_token: bool = True, authenticated: bool = False
