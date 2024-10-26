@@ -1,5 +1,8 @@
 # Changelog
 
+Version 0.1.9.2 - 2024-10-26 Unoffical version 
+- Fix: If API calls fail with Forbidden, attempt to fetch a new chip and retry (Credit goes to https://github.com/buske/libby-calibre-plugin)
+
 Version 0.1.9.1 - 2024-09-27 Unoffical version 
 
 Version 0.1.9a - 2024-09-11 Unoffical version 

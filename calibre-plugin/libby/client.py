@@ -24,7 +24,7 @@ from urllib import parse, request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin
 from urllib.request import HTTPCookieProcessor, Request, build_opener
-
+from ..config import PREFS, PreferenceKeys
 from .errors import ClientConnectionError, ErrorHandler, ClientForbiddenError
 from .utils import StringEnum
 
@@ -620,6 +620,8 @@ class LibbyClient(object):
         )
         if update_internal_token and res.get("identity"):
             self.identity_token = res["identity"]
+            PREFS[PreferenceKeys.LIBBY_TOKEN] = res["identity"]
+
         return res
 
     def clone_by_code(self, code: str) -> Dict:
