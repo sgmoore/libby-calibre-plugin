@@ -353,6 +353,13 @@ class LoansDialogMixin(BaseDialogMixin):
                         row.data(Qt.UserRole)
                     )
 
+    def openLibbyDownload(self, loan) :
+       
+        libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
+        
+        print(libbyurl)
+        open_url(libbyurl)
+       
     def download_loan(self, loan: Dict):
         # do actual downloading of the loan
 
@@ -373,6 +380,7 @@ class LoansDialogMixin(BaseDialogMixin):
 
         if LibbyClient.is_downloadable_ebook_loan(loan):
             show_download_info(get_media_title(loan), self)
+            self.openLibbyDownload(loan)
             tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
 
             return self.download_ebook(
@@ -384,6 +392,7 @@ class LoansDialogMixin(BaseDialogMixin):
 
         if LibbyClient.is_downloadable_magazine_loan(loan):
             show_download_info(get_media_title(loan), self)
+            self.openLibbyDownload(loan)
             tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
             return self.download_magazine(
                 loan,
