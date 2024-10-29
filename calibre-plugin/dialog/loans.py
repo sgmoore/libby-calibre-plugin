@@ -357,7 +357,8 @@ class LoansDialogMixin(BaseDialogMixin):
        
         libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
         
-        print(libbyurl)
+        self.logger.debug("Opening %s" , libbyurl)
+
         open_url(libbyurl)
        
     def download_loan(self, loan: Dict):
@@ -381,25 +382,25 @@ class LoansDialogMixin(BaseDialogMixin):
         if LibbyClient.is_downloadable_ebook_loan(loan):
             show_download_info(get_media_title(loan), self)
             self.openLibbyDownload(loan)
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+            # tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
 
-            return self.download_ebook(
-                loan,
-                format_id,
-                filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
-                tags=tags,
-            )
+            # return self.download_ebook(
+            #     loan,
+            #     format_id,
+            #     filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
+            #     tags=tags,
+            # )
 
         if LibbyClient.is_downloadable_magazine_loan(loan):
             show_download_info(get_media_title(loan), self)
             self.openLibbyDownload(loan)
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
-            return self.download_magazine(
-                loan,
-                format_id,
-                filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
-                tags=tags,
-            )
+            # tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+            # return self.download_magazine(
+            #     loan,
+            #     format_id,
+            #     filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
+            #     tags=tags,
+            # )
 
         return self.download_empty_book(loan, format_id)
 
