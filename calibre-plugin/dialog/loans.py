@@ -16,6 +16,7 @@ from calibre.gui2.ebook_download import show_download_info
 from calibre.gui2.threaded_jobs import ThreadedJob
 from polyglot.builtins import as_unicode
 from qt.core import (
+    QApplication,
     QCheckBox,
     QCursor,
     QGridLayout,
@@ -354,12 +355,21 @@ class LoansDialogMixin(BaseDialogMixin):
                     )
 
     def openLibbyDownload(self, loan) :
-       
         libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
-        
         self.logger.debug("Opening %s" , libbyurl)
-
         open_url(libbyurl)
+       
+        try :        
+            mods = QApplication.keyboardModifiers()     
+            if mods & Qt.ShiftModifier:
+                libbyurl = f'https://sentry.libbyapp.com/card/{loan["cardId"]}/loan/{loan["id"]}/fulfill/ebook-epub-adobe'
+                self.logger.debug("Opening %s" , libbyurl)
+                open_url(libbyurl)
+        except Exception as err:
+            self.logger.debug("Error detecting shift  %s" , err)
+
+
+        
        
     def download_loan(self, loan: Dict):
         # do actual downloading of the loan
@@ -382,6 +392,7 @@ class LoansDialogMixin(BaseDialogMixin):
         if LibbyClient.is_downloadable_ebook_loan(loan):
             show_download_info(get_media_title(loan), self)
             self.openLibbyDownload(loan)
+            return
             # tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
 
             # return self.download_ebook(
@@ -394,6 +405,7 @@ class LoansDialogMixin(BaseDialogMixin):
         if LibbyClient.is_downloadable_magazine_loan(loan):
             show_download_info(get_media_title(loan), self)
             self.openLibbyDownload(loan)
+            return
             # tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
             # return self.download_magazine(
             #     loan,
