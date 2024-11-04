@@ -614,7 +614,11 @@ class LibbyClient(object):
         """
         res: Dict = self.send_request(
             "chip",
-            query={"client": "dewey"},
+            # query={"client": "dewey"},  
+            query = {
+                 "c": "d:16.7.0"   ,
+                 "s": "0",              
+            },
             method="POST",
             authenticated=authenticated,
         )

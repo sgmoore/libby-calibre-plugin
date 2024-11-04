@@ -195,6 +195,16 @@ class OverdriveLibbyAction(InterfaceAction):
     def show_dialog(self):
         base_plugin_object = self.interface_action_base_plugin
         do_user_config = base_plugin_object.do_user_config
+
+        # Jump into configuration if we are missing a token.
+        if (not bool(PREFS[PreferenceKeys.LIBBY_TOKEN])) :
+            self.interface_action_base_plugin.do_user_config(self.gui )
+
+            # If we still do not have a token, then exit
+            if (not bool(PREFS[PreferenceKeys.LIBBY_TOKEN])) :
+                return     
+
+
         if not self.main_dialog:
             self.main_dialog = OverdriveLibbyDialog(
                 self.gui,
