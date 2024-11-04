@@ -151,7 +151,7 @@ class OverdriveLibbyAction(InterfaceAction):
             "help.png",
             description=_("View setup and usage help"),
             triggered=lambda: open_url(
-                "https://github.com/ping/libby-calibre-plugin#setup"
+                "https://github.com/sgmoore/libby-calibre-plugin#setup"
             ),
         )
         self.create_menu_action(
@@ -161,7 +161,7 @@ class OverdriveLibbyAction(InterfaceAction):
             self.resources[PluginImages.Information],
             description=_("See what's changed in the latest release"),
             triggered=lambda: open_url(
-                "https://github.com/ping/libby-calibre-plugin/blob/main/CHANGELOG.md"
+                "https://github.com/sgmoore/libby-calibre-plugin/blob/main/CHANGELOG.md"
             ),
         )
         self.create_menu_action(

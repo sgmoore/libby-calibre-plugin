@@ -11,7 +11,7 @@ package_name='libby-calibre-plugin'
 xgettext -L Python \
   --package-name="$package_name" \
   --package-version="$version" \
-  --msgid-bugs-address='https://github.com/ping/libby-calibre-plugin/' \
+  --msgid-bugs-address='https://github.com/sgmoore/libby-calibre-plugin/' \
   --copyright-holder='ping <http://github.com/ping>' \
   -o calibre-plugin/translations/default.pot calibre-plugin/*.py calibre-plugin/**/*.py
 

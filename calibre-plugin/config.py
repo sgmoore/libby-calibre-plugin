@@ -270,7 +270,7 @@ class ConfigWidget(QWidget):
 
         # Help label
         self.help_lbl = QLabel(
-            '<a style="padding: 0 4px;" href="https://github.com/ping/libby-calibre-plugin#setup">'
+            '<a style="padding: 0 4px;" href="https://github.com/sgmoore/libby-calibre-plugin#setup">'
             + _c("Help")
             + "</a>"
         )

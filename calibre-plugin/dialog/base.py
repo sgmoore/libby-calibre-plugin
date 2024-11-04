@@ -179,7 +179,7 @@ class BaseDialogMixin(QDialog):
             "background-color: rgba(127, 127, 127, 0.1); border-radius: 4px;"
         )
         help_lbl = QLabel(
-            '<a href="https://github.com/ping/libby-calibre-plugin#usage">'
+            '<a href="https://github.com/sgmoore/libby-calibre-plugin#usage">'
             + _c("Help")
             + '</a> / <a href="https://www.mobileread.com/forums/showthread.php?t=354816">'
             + _("MobileRead")
