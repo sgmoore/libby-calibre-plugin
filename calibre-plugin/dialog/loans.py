@@ -155,6 +155,20 @@ class LoansDialogMixin(BaseDialogMixin):
         widget.layout.addWidget(
             self.hide_book_already_in_lib_checkbox, widget_row_pos, 0, 1, 2
         )
+
+        # Create empty calibre book 
+        self.empty_book_btn = DefaultQPushButton(
+            ("Create empty entry in calibre"), None, self
+        )
+        self.empty_book_btn.setToolTip(_("Creates an empty entry in Calibre with the details of the loan"))
+        self.empty_book_btn.clicked.connect(self.empty_book_btn_clicked)
+        widget.layout.addWidget(
+            self.empty_book_btn,
+            widget_row_pos,
+            self.view_hspan - 2,
+        )
+       
+
         # Download button
         self.download_btn = DefaultQPushButton(
             _c("Open in libbyapp.com"), self.resources[PluginImages.Download], self
@@ -343,6 +357,26 @@ class LoansDialogMixin(BaseDialogMixin):
     def hold_action_triggered(self, loan):
         card = self.loans_model.get_card(loan["cardId"])
         self.create_hold(loan, card)
+
+    def empty_book_btn_clicked(self):
+        selection_model = self.loans_view.selectionModel()
+        if selection_model.hasSelection():
+            rows = selection_model.selectedRows()
+            for row in reversed(rows):
+                loan = row.data(Qt.UserRole)
+            try:
+                format_id = LibbyClient.get_loan_format(
+                    loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
+                )
+            except ValueError:
+                # kindle
+                format_id = LibbyClient.get_locked_in_format(loan)
+                
+            if LibbyClient.is_downloadable_magazine_loan(loan):
+                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+            else :
+                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+            self.download_empty_book(loan, format_id, tags)
 
     def download_btn_clicked(self):
         selection_model = self.loans_view.selectionModel()
