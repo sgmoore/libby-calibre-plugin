@@ -155,9 +155,9 @@ class LoansDialogMixin(BaseDialogMixin):
         )
         # Download button
         self.download_btn = DefaultQPushButton(
-            _c("Download"), self.resources[PluginImages.Download], self
+            _c("Open in libbyapp.com"), self.resources[PluginImages.Download], self
         )
-        self.download_btn.setToolTip(_("Download selected loans"))
+        self.download_btn.setToolTip(_("Open loan in libbyapp.com website"))
         self.download_btn.clicked.connect(self.download_btn_clicked)
         widget.layout.addWidget(
             self.download_btn,
@@ -347,12 +347,18 @@ class LoansDialogMixin(BaseDialogMixin):
         if selection_model.hasSelection():
             rows = selection_model.selectedRows()
             for row in reversed(rows):
-                self.download_loan(row.data(Qt.UserRole))
-                if PREFS[PreferenceKeys.HIDE_BOOKS_ALREADY_IN_LIB]:
-                    self.loans_search_proxy_model.temporarily_hide(
-                        row.data(Qt.UserRole)
-                    )
+                self.openLibbyDownload(row.data(Qt.UserRole))
+                # self.download_loan(row.data(Qt.UserRole))
+                # if PREFS[PreferenceKeys.HIDE_BOOKS_ALREADY_IN_LIB]:
+                #     self.loans_search_proxy_model.temporarily_hide(
+                #         row.data(Qt.UserRole)
+                #     )
 
+    def openLibbyDownload(self, loan) :
+        libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
+        self.logger.debug("Opening %s" , libbyurl)
+        open_url(libbyurl)         
+       
     def download_loan(self, loan: Dict):
         # do actual downloading of the loan
 
