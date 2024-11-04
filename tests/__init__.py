@@ -7,6 +7,8 @@
 # See https://github.com/ping/libby-calibre-plugin for more
 # information
 #
+# Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
+#
 
 # noqa
 import sys

@@ -7,6 +7,8 @@
 # See https://github.com/ping/libby-calibre-plugin for more
 # information
 #
+# Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
+#
 from collections import namedtuple
 from functools import cmp_to_key
 from typing import Dict, List, Optional

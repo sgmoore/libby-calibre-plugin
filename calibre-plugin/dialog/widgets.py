@@ -7,6 +7,8 @@
 # See https://github.com/ping/libby-calibre-plugin for more
 # information
 #
+# Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
+#
 
 from calibre.gui2.viewer.overlay import LoadingOverlay
 from qt.core import (

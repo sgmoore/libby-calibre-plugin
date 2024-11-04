@@ -7,6 +7,8 @@
 # See https://github.com/ping/libby-calibre-plugin for more
 # information
 #
+# Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
+#
 from typing import Dict, List
 
 from calibre.constants import DEBUG
