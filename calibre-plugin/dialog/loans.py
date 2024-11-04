@@ -156,9 +156,9 @@ class LoansDialogMixin(BaseDialogMixin):
         )
         # Download button
         self.download_btn = DefaultQPushButton(
-            _c("Download"), self.resources[PluginImages.Download], self
+            _c("Open in libbyapp.com"), self.resources[PluginImages.Download], self
         )
-        self.download_btn.setToolTip(_("Download selected loans"))
+        self.download_btn.setToolTip(_("Open loan in libbyapp.com website"))
         self.download_btn.clicked.connect(self.download_btn_clicked)
         widget.layout.addWidget(
             self.download_btn,
@@ -383,11 +383,15 @@ class LoansDialogMixin(BaseDialogMixin):
             tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
             format_id = LibbyClient.get_locked_in_format(loan)
             if format_id:
+                self.openLibbyDownload(loan)
+                return
                 # create empty book
-                return self.download_empty_book(loan, format_id, tags)
+                # return self.download_empty_book(loan, format_id, tags)
 
         if LibbyClient.is_downloadable_audiobook_loan(loan):
-            return self.download_empty_book(loan, format_id)
+            self.openLibbyDownload(loan)
+            return
+            # return self.download_empty_book(loan, format_id)
 
         if LibbyClient.is_downloadable_ebook_loan(loan):
             show_download_info(get_media_title(loan), self)

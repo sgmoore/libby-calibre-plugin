@@ -1,5 +1,10 @@
 # Changelog
 
+Version 0.1.9.3 - 2024-11-04 
+- Fix: Renamed Download button to 'Open in libbyapp.com' to as it now longer downloads anything
+- Fix: Amended setup procedure to take a token or sonos setup code.
+
+
 Version 0.1.9.2 - 2024-10-26 Unoffical version 
 - Fix: If API calls fail with Forbidden, attempt to fetch a new chip and retry (Credit goes to https://github.com/buske/libby-calibre-plugin)
 

@@ -21,6 +21,7 @@ except:  # noqa
     CreateNewCustomColumn = None
 
 from qt.core import (
+    QApplication,
     QCheckBox,
     QFormLayout,
     QGroupBox,
@@ -102,7 +103,7 @@ class SearchMode:
 
 class PreferenceTexts:
     LIBBY_SETUP_CODE = _("Libby Setup Code")
-    LIBBY_SETUP_CODE_DESC = _("8-digit setup code")
+    LIBBY_SETUP_CODE_DESC = _("8-digit setup code or authorization token")
     HIDE_MAGAZINES = _("Hide Magazines")
     HIDE_EBOOKS = _("Hide Ebooks")
     INCL_NONDOWNLOADABLE_TITLES = _("Include titles without downloadable formats")
@@ -215,7 +216,7 @@ class ConfigWidget(QWidget):
 
         # Libby Setup Code
         self.libby_setup_code_lbl = QLabel(
-            '<a href="https://help.libbyapp.com/en-us/6070.htm">'
+            '<a href="https://libbyapp.com/interview/authenticate/setup-code">'
             + PreferenceTexts.LIBBY_SETUP_CODE
             + "</a>"
         )
@@ -224,17 +225,27 @@ class ConfigWidget(QWidget):
         self.libby_setup_code_lbl.setMinimumWidth(150)
         self.libby_setup_code_txt = QLineEdit(self)
         self.libby_setup_code_txt.setToolTip(
-            _("Enter the 8-digit Libby setup code generated from another device")
+            _("To generate a setup code, Click on the link to the left and select the option to configure sonos speakers")
         )
         self.libby_setup_code_txt.setPlaceholderText(
             PreferenceTexts.LIBBY_SETUP_CODE_DESC
         )
-        self.libby_setup_code_txt.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r"\d{8}"))
-        )
+        # Disable regular expression to allow us to paste in a token from the website.
+        # self.libby_setup_code_txt.setValidator(
+        #    QRegularExpressionValidator(QRegularExpression(r"\d{8}"))
+        #)
 
         if not DEMO_MODE:
             self.libby_setup_code_txt.setText(PREFS[PreferenceKeys.LIBBY_SETUP_CODE])
+            if (PREFS[PreferenceKeys.LIBBY_SETUP_CODE] == '') :
+                try :
+                    clipboard = QApplication.clipboard()
+                    clip = clipboard.text()
+                    if (clip.find('Bearer') != -1 or clip.find('"libby_token"') != -1) :
+                        self.libby_setup_code_txt.setText(clip)
+                except Exception as err :
+                    logger.warning("Could not monitor clipboard : %s", err)
+
         libby_layout.addRow(self.libby_setup_code_lbl, self.libby_setup_code_txt)
 
         if is_configured:
@@ -849,11 +860,38 @@ class ConfigWidget(QWidget):
 
         setup_code = self.get_new_setup_code()
         if setup_code:
-            # if libby sync code has changed, do sync and save token
-            from .libby import LibbyClient
+            if (not self.validate_setup_code(setup_code)) :
+                return False
+        
+  
+        return True
 
-            if not LibbyClient.is_valid_sync_code(setup_code):
-                # save a http request for get_chip()
+    def validate_setup_code(self, setup_code) :            
+        from .libby import LibbyClient
+
+        libby_client = LibbyClient(
+            logger=logger,
+            timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
+            max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
+        )
+        chip_res = libby_client.get_chip()
+
+        # If the setup code is longer than 100 characters then assume it is a valid token extracted from the libbyapp.com website
+        # If the code is prefixed by Bearer or Authorization: or even "libby_token": then we should remove the prefix
+        # If the code is surrounded by quotation marks or spaces then we should also remove those.
+
+        if (len(setup_code) > 100) :
+            libby_client.identity_token = (setup_code
+                .removeprefix("Authorization:").strip()
+                .removeprefix("Bearer").strip()
+                .removeprefix('"libby_token":').strip()
+                .removeprefix('"').strip()
+                .removesuffix('"').strip()                    
+            )
+            chip_res["identity"] =  libby_client.identity_token 
+            setup_code = "00000000"  # We don't have a real setup_code, but this will avoid the 'libby not configured' messages
+        else :
+            if (not LibbyClient.is_valid_sync_code(setup_code)):                
                 error_dialog(
                     self,
                     _("Libby Setup Code"),
@@ -861,7 +899,22 @@ class ConfigWidget(QWidget):
                     show=True,
                 )
                 return False
-        return True
+
+            libby_client.clone_by_code(setup_code)
+
+        if libby_client.is_logged_in():
+            logger.warning("libby_client.is_logged_in() returns true")
+            PREFS[PreferenceKeys.LIBBY_SETUP_CODE] = setup_code
+            PREFS[PreferenceKeys.LIBBY_TOKEN] = chip_res["identity"]
+            return True
+        
+        error_dialog(
+            self,
+            _("Libby Setup Code"),
+            _("Authentication failed - Could not logon"),
+            show=True,
+        )
+        return False
 
     def save_settings(self):
         if DEMO_MODE:
@@ -938,22 +991,6 @@ class ConfigWidget(QWidget):
         PREFS[PreferenceKeys.CACHE_AGE_DAYS] = int(
             self.cache_age_txt.cleanText().strip()
         )
-
-        setup_code = self.get_new_setup_code()
-        if setup_code:
-            # if libby sync code has changed, do sync and save token
-            from .libby import LibbyClient
-
-            libby_client = LibbyClient(
-                logger=logger,
-                timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
-                max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
-            )
-            chip_res = libby_client.get_chip()
-            libby_client.clone_by_code(setup_code)
-            if libby_client.is_logged_in():
-                PREFS[PreferenceKeys.LIBBY_SETUP_CODE] = setup_code
-                PREFS[PreferenceKeys.LIBBY_TOKEN] = chip_res["identity"]
 
         if self.custom_column_creator and (
             self.custom_column_creator.gui.must_restart_before_config

@@ -93,8 +93,7 @@ DOWNLOADABLE_FORMATS = (
     # LibbyFormats.AudioBookMP3,
 )
 USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-    "Version/14.0.2 Safari/605.1.15"
+ "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) (Dewey; V26; iOS; 7.0.1-178)"
 )
 
 
@@ -614,7 +613,11 @@ class LibbyClient(object):
         """
         res: Dict = self.send_request(
             "chip",
-            query={"client": "dewey"},
+            # query={"client": "dewey"},  
+            query = {
+                 "c": "d:16.7.0"   ,
+                 "s": "0",              
+            },
             method="POST",
             authenticated=authenticated,
         )
