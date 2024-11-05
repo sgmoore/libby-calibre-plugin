@@ -1,6 +1,6 @@
 # ![main](images/plugin.svg) OverDrive Libby Plugin for calibre
 
-OverDrive Libby is a plugin that allows you to directly import your Libby loans into [calibre](https://calibre-ebook.com/).
+OverDrive Libby is a UI plugin that displays your Libby loans and holds and allows you to search for new books, borrow and return them. 
 
 Requires calibre 5.34.0 or newer.
 
@@ -14,7 +14,7 @@ Requires calibre 5.34.0 or newer.
 Integrates with the [OverDrive Link plugin](https://www.mobileread.com/forums/showthread.php?t=187919).  
 
 99% of this plugin was written by ping. You can express your thanks by clicking here :
-[![Buy ping a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=ping&button_colour=FFDD00&font_colour=000000&font_family=Bree&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/ping)
+[![Buy ping a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20ping%20a%20coffee&emoji=&slug=ping&button_colour=FFDD00&font_colour=000000&font_family=Bree&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/ping)
 
 ## Install
 

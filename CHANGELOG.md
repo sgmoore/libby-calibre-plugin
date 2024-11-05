@@ -1,17 +1,17 @@
 # Changelog
 
-Version 0.2.0 - 2024-11-04  This version is now considered the offical plugin
+Version 0.2.0 - 2024-11-04  This version is now considered the official plugin
 - Fix: Renamed Download button to 'Open in libbyapp.com' as it no longer downloads anything
 - Fix: Amended setup procedure to take a token or sonos setup code.
 - New: Added option to create an empty entry in calibre for all loan types.
 - Fix: Generates correct Odid reference for audiobooks which fixes https://github.com/ping/libby-calibre-plugin/issues/16
 
-Version 0.1.9.2 - 2024-10-26 Unoffical version 
+Version 0.1.9.2 - 2024-10-26 Unofficial version 
 - Fix: If API calls fail with Forbidden, attempt to fetch a new chip and retry (Credit goes to https://github.com/buske/libby-calibre-plugin)
 
-Version 0.1.9.1 - 2024-09-27 Unoffical version 
+Version 0.1.9.1 - 2024-09-27 Unofficial version 
 
-Version 0.1.9a - 2024-09-11 Unoffical version 
+Version 0.1.9a - 2024-09-11 Unofficial version 
 - Fix: Uses libbyapp.com domain rather than svc.overdrive.com which fixes https://github.com/ping/libby-calibre-plugin/issues/33
 - Fix: Applied spicefather's fix for date time formats (see https://github.com/ping/libby-calibre-plugin/pull/17) 
 
