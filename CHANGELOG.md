@@ -1,5 +1,11 @@
 # Changelog
 
+Version 0.2.0 - 2024-11-04  This version is now considered the offical plugin
+- Fix: Renamed Download button to 'Open in libbyapp.com' as it no longer downloads anything
+- Fix: Amended setup procedure to take a token or sonos setup code.
+- New: Added option to create an empty entry in calibre for all loan types.
+- Fix: Generates correct Odid reference for audiobooks which fixes https://github.com/ping/libby-calibre-plugin/issues/16
+
 Version 0.1.9.2 - 2024-10-26 Unoffical version 
 - Fix: If API calls fail with Forbidden, attempt to fetch a new chip and retry (Credit goes to https://github.com/buske/libby-calibre-plugin)
 

@@ -6,19 +6,15 @@ Requires calibre 5.34.0 or newer.
 
 ## Main Features
 
-- Import the `.acsm` file for EPUB/PDF(DRM) book loans
-- Import the `.epub`/`pdf` file for EPUB/PDF (open) book loans
-- Import the `.epub` file for Magazines loans \[EXPERIMENTAL\]
-- Import Kindle / audiobook loans as empty books
+- Import loans as empty books
 - View and borrow holds
 - Monitor magazines for new issues
 - Simple search across your linked libraries
 
-This plugin is compatible with the [ACSM Input plugin](https://github.com/Leseratte10/acsm-calibre-plugin/) for converting `.acsm` files into `.epub`.
+Integrates with the [OverDrive Link plugin](https://www.mobileread.com/forums/showthread.php?t=187919).  
 
-Also integrates with the [OverDrive Link plugin](https://www.mobileread.com/forums/showthread.php?t=187919). If an existing book has a matching OverDrive link and no formats, the loan download will be added to the book.
-
-[![Buy me a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=ping&button_colour=FFDD00&font_colour=000000&font_family=Bree&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/ping)
+99% of this plugin was written by ping. You can express your thanks by clicking here :
+[![Buy ping a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=ping&button_colour=FFDD00&font_colour=000000&font_family=Bree&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/ping)
 
 ## Install
 
@@ -26,7 +22,7 @@ Open Preferences > Plugins > Get new plugins, and install the "OverDrive Libby" 
 
 You may also download the latest plugin zip file from Releases and install the plugin manually, then restart calibre as described in the [Introduction to Plugins](https://www.mobileread.com/forums/showthread.php?t=118680) thread.
 
-To try out unreleased versions, go to [GitHub Actions](https://github.com/ping/libby-calibre-plugin/actions?query=branch%3Amain), and click on the latest run. The downloadable artifact, e.g. `overdrive-libby-plugin-1a2b3c4` will be an installable plugin zip. You will need to be logged in to GitHub to download artifacts.
+To try out unreleased versions, go to [GitHub Actions](https://github.com/sgmoore/libby-calibre-plugin/actions?query=branch%3Amain), and click on the latest run. The downloadable artifact, e.g. `overdrive-libby-plugin-1a2b3c4` will be an installable plugin zip. You will need to be logged in to GitHub to download artifacts.
 
 ## Setup
 
@@ -36,7 +32,7 @@ Open the plugin customization settings (Preferences > Advanced: Plugins > Search
 
 ![settings](images/settings.gif)
 
-Get a Libby setup code by following the instructions [here](https://help.libbyapp.com/en-us/6070.htm). Enter the 8-digit code into the plugin settings and click "OK". If you encounter an error, the code may have expired. Get a new one and try again.
+Get a Libby setup code by going [here](https://libbyapp.com/interview/authenticate/setup-code) and follow the instructions to connect sonos speakers and copy the code to the plugin settings and click "OK". If you encounter an error, the code may have expired. Get a new one and try again.
 
 You should only need to do this setup once. Then add the plugin to the toolbar/menubar as you wish.
 
@@ -115,11 +111,16 @@ You should only need to do this setup once. Then add the plugin to the toolbar/m
 
 ![Loans](images/loans.png)
 
-Launch the OverDrive Libby plugin, and click on the "Loans" tab. Select the loans you wish to download, then click on the "Download" button.
+Launch the OverDrive Libby plugin, and click on the "Loans" tab. 
 
-Each selected loan will then be downloaded in its own calibre job. When the job completes, the loan book file should be in your library.
+~~Select the loans you wish to download, then click on the "Download" button.~~
 
-Only downloadable loans will be listed. If the loan does not have a downloadable format, or has previously been sent to your Kindle, it will not be shown unless "Include titles without downloadable formats" is enabled in setup.
+~~Each selected loan will then be downloaded in its own calibre job. When the job completes, the loan book file should be in your library.~~
+
+~~Only downloadable loans will be listed. If the loan does not have a downloadable format, or has previously been sent to your Kindle, it will not be shown unless "Include titles without downloadable formats" is enabled in setup.~~
+
+Automatic downloads are no longer supported. You can open the loan directly in the libbyapp.com website and you can currently download ebooks for use with Adobe Digital Editions from there.
+
 
 Select a row, right-click and select the appropriate action to:
 - Return a loan
@@ -195,9 +196,9 @@ If you wish to see loans that are not fully downloadable (e.g. Kindle loans, aud
 
 This is because the loan does not have a supported downloadable format available. The loan is either not available in epub/pdf, or you have chosen to Read with Kindle (see above for details about [Format Locking](#format-locking)).
 
-### Why can't I download a particular magazine?
+### Why can't I download a magazine?
 
-Not all magazines are downloadable. Only magazines that have [readable individual articles](https://help.libbyapp.com/en-us/6215.htm) can be downloaded.
+Libby no longer allow magazines to be downloaded.
 
 ## Credit
 
