@@ -273,11 +273,17 @@ def generate_od_identifier(media: Dict, library: Dict) -> str:
     try:
         from calibre_plugins.overdrive_link.link import ODLink
 
+        from .libby import LibbyMediaTypes
+        from .overdrive import OverDriveClient
+
+        isAudioBook = OverDriveClient.extract_type(media) == LibbyMediaTypes.Audiobook
+
         return str(
             ODLink(
                 provider_id="",
                 library_id=f'{library["preferredKey"]}.overdrive.com',
                 book_id=media["id"],
+                is_audiobook = isAudioBook
             )
         )
     except ImportError:

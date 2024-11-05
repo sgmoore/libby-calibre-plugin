@@ -397,9 +397,11 @@ class BaseDialogMixin(QDialog):
                 search_conditions.append(
                     f'identifiers:"={OD_IDENTIFIER}:{generate_od_identifier(media, library)}"'
                 )
-            else:
+            else: 
+                terminator = '#' if OverDriveClient.extract_type(media) == LibbyMediaTypes.Audiobook else '@'
+
                 search_conditions.append(
-                    rf'identifiers:"={OD_IDENTIFIER}:~^{media["id"]}\@"'
+                    rf'identifiers:"={OD_IDENTIFIER}:~^{media["id"]}\{terminator}"'
                 )
         return search_conditions
 
