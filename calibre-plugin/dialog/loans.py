@@ -39,7 +39,6 @@ from ..compat import (
 )
 from ..config import PREFS, PreferenceKeys, PreferenceTexts
 from ..ebook_download import CustomEbookDownload
-from ..empty_download import EmptyBookDownload
 from ..libby import LibbyClient, LibbyFormats
 from ..loan_actions import LibbyLoanRenew, LibbyLoanReturn
 from ..magazine_download import CustomMagazineDownload
@@ -61,7 +60,7 @@ load_translations()
 
 gui_ebook_download = CustomEbookDownload()
 gui_magazine_download = CustomMagazineDownload()
-guid_empty_download = EmptyBookDownload()
+
 gui_libby_return = LibbyLoanReturn()
 gui_renew_loan = LibbyLoanRenew()
 
@@ -161,7 +160,7 @@ class LoansDialogMixin(BaseDialogMixin):
             ("Create empty entry in calibre"), None, self
         )
         self.empty_book_btn.setToolTip(_("Creates an empty entry in Calibre with the details of the loan"))
-        self.empty_book_btn.clicked.connect(self.empty_book_btn_clicked)
+        self.empty_book_btn.clicked.connect(self.loans_empty_book_btn_clicked)
         widget.layout.addWidget(
             self.empty_book_btn,
             widget_row_pos,
@@ -358,25 +357,8 @@ class LoansDialogMixin(BaseDialogMixin):
         card = self.loans_model.get_card(loan["cardId"])
         self.create_hold(loan, card)
 
-    def empty_book_btn_clicked(self):
-        selection_model = self.loans_view.selectionModel()
-        if selection_model.hasSelection():
-            rows = selection_model.selectedRows()
-            for row in reversed(rows):
-                loan = row.data(Qt.UserRole)
-            try:
-                format_id = LibbyClient.get_loan_format(
-                    loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
-                )
-            except ValueError:
-                # kindle
-                format_id = LibbyClient.get_locked_in_format(loan)
-                
-            if LibbyClient.is_downloadable_magazine_loan(loan):
-                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
-            else :
-                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
-            self.download_empty_book(loan, format_id, tags)
+    def loans_empty_book_btn_clicked(self):
+        self.empty_book_btn_clicked(self.downloaded_loan, self.loans_view.selectionModel(), self.loans_model)
 
     def download_btn_clicked(self):
         selection_model = self.loans_view.selectionModel()
@@ -408,10 +390,10 @@ class LoansDialogMixin(BaseDialogMixin):
             format_id = LibbyClient.get_locked_in_format(loan)
             if format_id:
                 # create empty book
-                return self.download_empty_book(loan, format_id, tags)
+                return self.download_empty_loan(self, format_id, tags)
 
         if LibbyClient.is_downloadable_audiobook_loan(loan):
-            return self.download_empty_book(loan, format_id)
+            return self.download_empty_loan(self, loan, format_id)
 
         if LibbyClient.is_downloadable_ebook_loan(loan):
             show_download_info(get_media_title(loan), self)
@@ -434,55 +416,11 @@ class LoansDialogMixin(BaseDialogMixin):
                 tags=tags,
             )
 
-        return self.download_empty_book(loan, format_id)
+        return self.download_empty_loan(loan, format_id)
 
-    def match_existing_book(self, loan: Dict, library: Dict, format_id: str):
-        book_id = None
-        mi = None
-        if not PREFS[PreferenceKeys.ALWAYS_DOWNLOAD_AS_NEW]:
-            search_conditions = self.generate_search_conditions(
-                loan, library, format_id
-            )
-            if search_conditions:
-                # search for existing empty book only if there is at least 1 search condition
-                search_query = " or ".join(search_conditions)
-                restriction = "format:False"
-                # use restriction because it's apparently cached
-                # ref: https://manual.calibre-ebook.com/db_api.html#calibre.db.cache.Cache.search
-                self.logger.debug(
-                    "Library Search Query (with restriction: %s): %s",
-                    restriction,
-                    search_query,
-                )
-                book_ids = list(self.db.search(search_query, restriction=restriction))
-                # prioritise match by identifiers
-                loan_isbn = OverDriveClient.extract_isbn(
-                    loan.get("formats", []), [format_id] if format_id else []
-                )
-                if format_id and not loan_isbn:
-                    # try again without format_id
-                    loan_isbn = OverDriveClient.extract_isbn(
-                        loan.get("formats", []), []
-                    )
-                loan_asin = OverDriveClient.extract_asin(loan.get("formats", []))
-                for bi in book_ids:
-                    identifiers = self.db.get_metadata(bi).get_identifiers()
-                    if (
-                        loan_isbn
-                        and identifiers.get("isbn")
-                        and loan_isbn == identifiers.get("isbn")
-                    ) or (
-                        loan_asin
-                        and identifiers.get("amazon")
-                        and loan_asin == identifiers.get("amazon")
-                    ):
-                        book_id = bi
-                        break
-                if not book_id:
-                    # we still haven't matched one using identifiers, then just take the first one
-                    book_id = book_ids[0] if book_ids else 0
-                mi = self.db.get_metadata(book_id) if book_id else None
-        return book_id, mi
+    def download_empty_loan(self, loan, format_id, tags=None):
+        self.download_empty_book(self.downloaded_loan, self.loans_model, loan, format_id , tags)
+  
 
     def download_ebook(self, loan: Dict, format_id: str, filename: str, tags=None):
         if not tags:
@@ -533,7 +471,6 @@ class LoansDialogMixin(BaseDialogMixin):
         )
         self.gui.job_manager.run_threaded_job(job)
         self.gui.status_bar.show_message(description, 3000)
-
     def download_magazine(self, loan: Dict, format_id: str, filename: str, tags=None):
         if not tags:
             tags = []
@@ -546,7 +483,7 @@ class LoansDialogMixin(BaseDialogMixin):
         # Heavily referenced from
         # https://github.com/kovidgoyal/calibre/blob/58c609fa7db3a8df59981c3bf73823fa1862c392/src/calibre/gui2/ebook_download.py#L127-L152
 
-        book_id, mi = self.match_existing_book(loan, library, format_id)
+        book_id, mi = self.match_existing_book(self.loans_model , loan, library, format_id)
         if mi and book_id:
             self.logger.debug("Matched existing empty book: %s", mi.title)
 
@@ -642,43 +579,6 @@ class LoansDialogMixin(BaseDialogMixin):
             # most likely because the plugin UI was closed before download was completed
             self.logger.warning("Error displaying media results: %s", runtime_err)
         self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
-
-    def download_empty_book(self, loan, format_id, tags=None):
-        if not tags:
-            tags = []
-        card = self.loans_model.get_card(loan["cardId"])
-        library = self.loans_model.get_library(self.loans_model.get_website_id(card))
-
-        book_id, mi = self.match_existing_book(loan, library, format_id)
-        description = _(
-            "Downloading empty book for {book}".format(
-                book=as_unicode(get_media_title(loan), errors="replace")
-            )
-        )
-        callback = Dispatcher(self.downloaded_loan)
-        job = ThreadedJob(
-            "overdrive_libby_download_book",
-            description,
-            guid_empty_download,
-            (
-                self.gui,
-                self.client,
-                self.overdrive_client,
-                loan,
-                card,
-                library,
-                format_id,
-                book_id,
-                mi,
-                tags,
-            ),
-            {},
-            callback,
-            max_concurrent_count=1,
-            killable=False,
-        )
-        self.gui.job_manager.run_threaded_job(job)
-        self.gui.status_bar.show_message(description, 3000)
 
     def read_with_kindle_action_triggered(self, loan: Dict, format_id: str):
         require_confirmation = LibbyClient.is_downloadable_ebook_loan(

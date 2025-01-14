@@ -32,6 +32,7 @@ from qt.core import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QItemSelectionModel,
     QLabel,
     QLayout,
     QMenu,
@@ -53,6 +54,7 @@ from .widgets import ClickableQLabel, CustomLoadingOverlay, DefaultQPushButton
 from .. import DEMO_MODE, logger
 from ..compat import QToolButton_ToolButtonPopupMode_DelayedPopup, _c, ngettext_c
 from ..config import BorrowActions, PREFS, PreferenceKeys, SearchMode
+from ..empty_download import EmptyBookDownload
 from ..hold_actions import LibbyHoldCreate
 from ..libby import LibbyClient, LibbyMediaTypes
 from ..libby.errors import (
@@ -84,6 +86,9 @@ if False:
     load_translations = _ = lambda x=None: x
 
 load_translations()
+
+guid_empty_download = EmptyBookDownload()
+
 
 gui_create_hold = LibbyHoldCreate()
 
@@ -146,7 +151,7 @@ class BaseDialogMixin(QDialog):
         self.media_cache = media_cache
         self.setWindowIcon(icon)
         self.view_vspan = 1
-        self.view_hspan = 4
+        self.view_hspan = 7
         self.min_button_width = (
             150  # use this to set min col width for cols containing buttons
         )
@@ -741,6 +746,122 @@ class BaseDialogMixin(QDialog):
             key=cmp_to_key(OverDriveClient.sort_availabilities),
             reverse=True,
         )
+
+    def match_existing_book(self, book: Dict, library: Dict, format_id: str):
+        book_id = None
+        mi = None
+        if not PREFS[PreferenceKeys.ALWAYS_DOWNLOAD_AS_NEW]:
+            search_conditions = self.generate_search_conditions(
+                book, library, format_id
+            )
+            if search_conditions:
+                # search for existing empty book only if there is at least 1 search condition
+                search_query = " or ".join(search_conditions)
+                restriction = "format:False"
+                # use restriction because it's apparently cached
+                # ref: https://manual.calibre-ebook.com/db_api.html#calibre.db.cache.Cache.search
+                self.logger.debug(
+                    "Library Search Query (with restriction: %s): %s",
+                    restriction,
+                    search_query,
+                )
+                book_ids = list(self.db.search(search_query, restriction=restriction))
+                # prioritise match by identifiers
+                book_isbn = OverDriveClient.extract_isbn(
+                    book.get("formats", []), [format_id] if format_id else []
+                )
+                if format_id and not book_isbn:
+                    # try again without format_id
+                    book_isbn = OverDriveClient.extract_isbn(
+                        book.get("formats", []), []
+                    )
+                book_asin = OverDriveClient.extract_asin(book.get("formats", []))
+                for bi in book_ids:
+                    identifiers = self.db.get_metadata(bi).get_identifiers()
+                    if (
+                        book_isbn
+                        and identifiers.get("isbn")
+                        and book_isbn == identifiers.get("isbn")
+                    ) or (
+                        book_asin
+                        and identifiers.get("amazon")
+                        and book_asin == identifiers.get("amazon")
+                    ):
+                        book_id = bi
+                        break
+                if not book_id:
+                    # we still haven't matched one using identifiers, then just take the first one
+                    book_id = book_ids[0] if book_ids else 0
+                mi = self.db.get_metadata(book_id) if book_id else None
+        return book_id, mi
+    
+    def pickFirstCard(self, book, model):
+        for k, site in book.get("siteAvailabilities", {}).items():
+            return next(iter(model.get_cards_for_library_key(k)),None,)       
+        
+
+    def download_empty_book(self, callBack, model : LibbyModel, book, format_id, tags=None):
+        if not tags:
+            tags = []
+
+        # If the book comes from a search, it will not have a cardId, so we pick a card for the first library 
+        if "cardId" in book :
+            card = model.get_card(book["cardId"])
+        else :
+            card = self.pickFirstCard(book, model)
+        
+        library = model.get_library(model.get_website_id(card))
+
+        book_id, mi = self.match_existing_book(book, library, format_id)
+        description = _(
+            "Downloading empty book for {book}".format(
+                book=as_unicode(get_media_title(book), errors="replace")
+            )
+        )
+        callback = Dispatcher(callBack)
+        job = ThreadedJob(
+            "overdrive_libby_download_book",
+            description,
+            guid_empty_download,
+            (
+                self.gui,
+                self.client,
+                self.overdrive_client,
+                book,
+                card,
+                library,
+                format_id,
+                book_id,
+                mi,
+                tags,
+            ),
+            {},
+            callback,
+            max_concurrent_count=1,
+            killable=False,
+        )
+        self.gui.job_manager.run_threaded_job(job)
+        self.gui.status_bar.show_message(description, 3000)
+
+    def empty_book_btn_clicked(self, callBack, selection_model : QItemSelectionModel , libby_model : LibbyModel):
+        
+        if selection_model.hasSelection():
+            rows = selection_model.selectedRows()
+            for row in reversed(rows):
+                book = row.data(Qt.UserRole)
+            try:
+                format_id = LibbyClient.get_loan_format(
+                    book, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
+                )
+            except ValueError:
+                # kindle
+                format_id = LibbyClient.get_locked_in_format(book)
+                
+            if LibbyClient.is_downloadable_magazine_loan(book):
+                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+            else :
+                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+            self.download_empty_book(callBack, libby_model , book, format_id, tags)
 
 
 class BookPreviewDialog(QDialog):

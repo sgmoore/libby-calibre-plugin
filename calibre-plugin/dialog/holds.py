@@ -156,6 +156,19 @@ class HoldsDialogMixin(BaseDialogMixin):
         widget.layout.addWidget(
             self.hide_unavailable_holds_checkbox, widget_row_pos, 0, 1, 2
         )
+
+        # Create empty calibre book 
+        self.empty_book_btn = DefaultQPushButton(
+            ("Create empty entry in calibre"), None, self
+        )
+        self.empty_book_btn.setToolTip(_("Creates an empty entry in Calibre with the details of the hold"))
+        self.empty_book_btn.clicked.connect(self.holds_empty_book_btn_clicked)
+        widget.layout.addWidget(
+            self.empty_book_btn,
+            widget_row_pos,
+            self.view_hspan - 2,
+        )
+               
         # Borrow button
         self.holds_borrow_btn = self.init_borrow_btn(self.do_hold_borrow_action)
         widget.layout.addWidget(
@@ -470,6 +483,23 @@ class HoldsDialogMixin(BaseDialogMixin):
                     self.holds_model.setData(index, updated_hold)
                     break
         self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
+
+    def empty_hold_callback (self, job):
+        if job.failed:
+            self.unhandled_exception(job.exception, msg=_c("Failed to create empty e-book"))
+
+        # try:
+        #     if job.result:
+        #         self.holds_search_proxy_model.unhide(job.result)
+        # except RuntimeError as runtime_err:
+        #     # most likely because the plugin UI was closed before download was completed
+        #     self.logger.warning("Error displaying media results: %s", runtime_err)
+        
+        self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
+
+    def holds_empty_book_btn_clicked(self):
+        self.empty_book_btn_clicked(self.empty_hold_callback, self.holds_view.selectionModel() , self.holds_model) 
+
 
 
 class SuspendHoldDialog(QDialog):

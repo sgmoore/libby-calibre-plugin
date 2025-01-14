@@ -147,6 +147,13 @@ class SearchDialogMixin(SearchBaseDialog):
         search_widget.layout.addWidget(
             self.search_hold_btn, widget_row_pos, self.view_hspan - 2
         )
+
+        # Create empty calibre book 
+        self.empty_book_btn = DefaultQPushButton(("Create empty entry in calibre"), None, self)
+        self.empty_book_btn.setToolTip(_("Creates an empty entry in Calibre with the details of the book"))
+        self.empty_book_btn.clicked.connect(self.search_empty_book_btn_clicked)
+        search_widget.layout.addWidget(self.empty_book_btn, widget_row_pos, self.view_hspan - 3)
+        
         # set last 2 col's min width (buttons)
         for i in (1, 2):
             search_widget.layout.setColumnMinimumWidth(
@@ -296,3 +303,11 @@ class SearchDialogMixin(SearchBaseDialog):
         worker.errored.connect(lambda err: errored_out(err))
 
         return thread
+
+    def empty_hold_callback (self, job):
+        if job.failed:
+            self.unhandled_exception(job.exception, msg=_c("Failed to create empty e-book"))
+        self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
+
+    def search_empty_book_btn_clicked(self):
+        self.empty_book_btn_clicked(self.empty_hold_callback, self.search_results_view.selectionModel() , self.search_model) 
