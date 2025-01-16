@@ -598,7 +598,7 @@ class ConfigWidget(QWidget):
         self.search_results_max_txt.setToolTip(
             _("Limit the number of search results returned")
         )
-        self.search_results_max_txt.setRange(20, 60)
+        self.search_results_max_txt.setRange(20, 100)
         self.search_results_max_txt.setSingleStep(10)
         self.search_results_max_txt.setValue(PREFS[PreferenceKeys.SEARCH_RESULTS_MAX])
         search_layout.addRow(
