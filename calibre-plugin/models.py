@@ -13,6 +13,7 @@ from collections import namedtuple
 from functools import cmp_to_key
 from typing import Dict, List, Optional
 
+from calibre.constants import DEBUG as CALIBRE_DEBUG
 from calibre.gui2 import elided_text
 from calibre.utils.config import tweaks
 from calibre.utils.date import dt_as_local, format_date
@@ -71,6 +72,86 @@ def get_media_title(
             title = f'{title}|{loan["id"]}'
 
     return title
+
+def get_series(book:Dict) -> str:
+    try :
+        ds = book.get("detailedSeries")
+        if (ds != None) :
+            seriesName = ds.get("seriesName") 
+            seriesNo = ds.get("readingOrder")
+            if seriesNo == None :
+                return seriesName 
+
+            width = 2 # Are there any series that have more than 99 books?
+            seriesNo = float(seriesNo)
+
+            if seriesNo.is_integer() :
+                return ( seriesName + " " + f"{int(seriesNo)}".rjust(width) + "  " )
+            else : 
+                return ( seriesName + " " +  f"{seriesNo}".rjust(width+2) )
+
+    except Exception as err:
+        print(f"Error getting series {err}")
+    return "" 
+
+def get_waitdays(media:Dict) -> str:
+    try :
+        sites = media.get("siteAvailabilities", {}) 
+
+        if not sites :
+           return "n/a"
+
+        title = get_media_title(media, include_subtitle=True)
+
+        smallestWaitDays = 999999 
+        
+        for key, site in sites.items():
+            availabilityType = site.get("AvailabilityType" , "")
+            isAvailable      = site.get("isAvailable", False)
+            isOwned          = site.get("isOwned", False)
+            available_copies = site.get("AvailableCopies", 0)
+            holds_count      = site.get("holdsCount",0)
+            owned_copies     = site.get("ownedCopies", 0) 
+            wait_days        = site.get("estimatedWaitDays", 0) 
+            lucky_day_copies = site.get("luckyDayAvailableCopies", 0)
+
+            # Note. 
+            # Available Copies is zero for always available books, but isAvailable looks to be accurate
+            # Owned Copies is quite often zero even if isOwned is true , but in this case isOwned is probably wrong ,
+            #    so we ignore isOwned and assume the book is not available
+
+            # Wait days can be > 0 if we some books are available.
+
+
+            if CALIBRE_DEBUG :
+                dbg = ""
+
+                # Test assumptions
+
+                if (isOwned == False) and (owned_copies > 0 ) :
+                   dbg = dbg  + " >>> Warning Check isOwned vs owned_copies "    
+
+                if (wait_days <= 0) and (isAvailable == False) and (owned_copies > 0) :
+                   dbg = dbg  + " >>> Warning Check Not Available but wait days <= 0 "    
+                                    
+                print(f"{dbg}{key} {title} : IsAvailable = {isAvailable} {availabilityType} available_copies = {available_copies} IsOwned= {isOwned} owned_copies = {owned_copies} {holds_count} held and wait time is around {wait_days} days  : lucky_day_copies = {lucky_day_copies} "  )
+
+
+            # If any site has a copy available then we can return immediately (no need to check other site)
+            if (available_copies > 0 or isAvailable == True or availabilityType == "always" or lucky_day_copies > 0)  :
+                return  ""
+            
+            if (owned_copies > 0 and wait_days > 0 and wait_days < smallestWaitDays) :
+                smallestWaitDays = wait_days
+                    
+        if (smallestWaitDays == 999999) :
+            return "n/a" 
+       
+        return smallestWaitDays
+
+    except Exception as err:
+        print(f"Error calculating waitdays {err}")
+    return "" 
 
 
 def is_valid_type(media: Dict, include_provisional=False) -> bool:
@@ -951,6 +1032,9 @@ class LibbySearchModel(LibbyModel):
         _c("Publisher"),
         _c("Format"),
         _("Library"),
+        _("Series"),
+        _("Wait"),
+
     ]
     filter_hide_magazines_already_in_library = False
 
