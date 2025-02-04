@@ -291,9 +291,9 @@ class CardWidget(QWidget):
 
         # Card Name
         card_name = (
-            card["cardName"]
+            card.get("cardName")
             if not DEMO_MODE
-            else obfuscate_name(card["cardName"] or "")
+            else obfuscate_name(card.get("cardName") or "")
         ) or ""
         self.card_lbl = ClickableQLabel(self.format_card_name(card_name))
         self.card_lbl.setTextFormat(Qt.RichText)

@@ -118,7 +118,7 @@ class SearchBaseDialog(BaseDialogMixin):
                     card_action = borrow_menu.addAction(
                         QIcon(self.get_card_pixmap(site["__library"])),
                         truncate_for_display(
-                            f'{card["advantageKey"]}: {card["cardName"] or ""}',
+                            f'{card["advantageKey"]}: {card.get("cardName") or ""}',
                             font=borrow_menu.font(),
                         ),
                     )
@@ -178,7 +178,7 @@ class SearchBaseDialog(BaseDialogMixin):
                     card_action = hold_menu.addAction(
                         QIcon(self.get_card_pixmap(site["__library"])),
                         truncate_for_display(
-                            f'{card["advantageKey"]}: {card["cardName"] or ""}',
+                            f'{card["advantageKey"]}: {card.get("cardName") or ""}',
                             font=hold_menu.font(),
                         ),
                     )

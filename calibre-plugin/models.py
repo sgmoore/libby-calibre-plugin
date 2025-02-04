@@ -781,8 +781,8 @@ class LibbyCardsModel(LibbyModel):
             return None
         if col == 0:
             return truncate_for_display(
-                f'{card["advantageKey"]}: {card["cardName"] or ""}'
-            )
+                f'{card["advantageKey"]}: {card.get("cardName") or ""}'
+            )   
         return None
 
 
@@ -865,7 +865,7 @@ class LibbyMagazinesModel(LibbyModel):
                 card = self.get_card(subscription["cardId"])
                 if not card:
                     return "Invalid card setup"
-                return f'{card["advantageKey"]}: {card["cardName"] or ""}'
+                return f'{card["advantageKey"]}: {card.get("cardName") or ""}'
         # DisplayRole, DisplaySortRole
         if role not in (Qt.DisplayRole, LibbyModel.DisplaySortRole):
             return None
@@ -881,7 +881,7 @@ class LibbyMagazinesModel(LibbyModel):
             if not card:
                 return "Invalid card setup"
             return truncate_for_display(
-                f'{card["advantageKey"]}: {card["cardName"] or ""}'
+                f'{card["advantageKey"]}: {card.get("cardName") or ""}'
             )
         if col == 3:
             is_borrowed = subscription.get(self.is_borrowed_key)
