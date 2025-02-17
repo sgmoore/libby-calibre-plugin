@@ -204,7 +204,7 @@ class BaseDialogMixin(QDialog):
         new_width = dialog_size.width()
         new_height = dialog_size.height()
         if PREFS[PreferenceKeys.MAIN_UI_WIDTH] != new_width:
-            PREFS[PreferenceKeys.MAIN_UI_HEIGHT] = new_width
+            PREFS[PreferenceKeys.MAIN_UI_WIDTH] = new_width
             logger.debug("Saved new UI width preference: %d", new_width)
         if PREFS[PreferenceKeys.MAIN_UI_HEIGHT] != new_height:
             PREFS[PreferenceKeys.MAIN_UI_HEIGHT] = new_height
