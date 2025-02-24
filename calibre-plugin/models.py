@@ -115,9 +115,7 @@ def get_waitdays_integer(title:str , key:str , dict:Dict) -> int:
     # Owned Copies is quite often zero even if isOwned is true , but in this case isOwned is probably wrong ,
     #    so we ignore isOwned and assume the book is not available
 
-    # Wait days can be > 0 if we some books are available.
-
-
+ 
     if CALIBRE_DEBUG :
         dbg = ""
 

@@ -607,7 +607,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                 else :
                     self.adv_search_btn.setText(_c("No more"))
                     self.adv_search_btn.setToolTip("")
-                    self.adv_search_btn.setEnabled(True)
+                    self.adv_search_btn.setEnabled(False)
                 
             else :
                 self.adv_search_btn.setText(_c("Search"))
