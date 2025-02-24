@@ -20,6 +20,7 @@ from calibre.utils.date import dt_as_local, format_date
 from calibre.utils.icu import lower as icu_lower
 from qt.core import (
     QAbstractTableModel,
+    QFileDialog,
     QFont,
     QModelIndex,
     QSortFilterProxyModel,
@@ -73,11 +74,14 @@ def get_media_title(
 
     return title
 
-def get_series(book:Dict) -> str:
+def get_series(book:Dict , truncate:bool) -> str:
     try :
         ds = book.get("detailedSeries")
         if (ds != None) :
-            seriesName = ds.get("seriesName") 
+            seriesName = ds.get("seriesName")
+            if truncate :
+                seriesName = truncate_for_display(seriesName)
+            
             seriesNo = ds.get("readingOrder")
             if seriesNo == None :
                 return seriesName 
@@ -94,57 +98,70 @@ def get_series(book:Dict) -> str:
         print(f"Error getting series {err}")
     return "" 
 
-def get_waitdays(media:Dict) -> str:
+NEVER_AVAILABLE = 999999
+
+def get_waitdays_integer(title:str , key:str , dict:Dict) -> int:
+    availabilityType = dict.get("AvailabilityType" , "")
+    isAvailable      = dict.get("isAvailable", False)
+    isOwned          = dict.get("isOwned", False)
+    available_copies = dict.get("AvailableCopies", 0)
+    holds_count      = dict.get("holdsCount",0)
+    owned_copies     = dict.get("ownedCopies", 0) 
+    wait_days        = dict.get("estimatedWaitDays", 0) 
+    lucky_day_copies = dict.get("luckyDayAvailableCopies", 0)
+
+    # Note. 
+    # Available Copies is zero for always available books, but isAvailable looks to be accurate
+    # Owned Copies is quite often zero even if isOwned is true , but in this case isOwned is probably wrong ,
+    #    so we ignore isOwned and assume the book is not available
+
+    # Wait days can be > 0 if we some books are available.
+
+
+    if CALIBRE_DEBUG :
+        dbg = ""
+
+        # Test assumptions
+
+        if (isOwned == False) and (owned_copies > 0 ) :
+            dbg = dbg  + " >>> Warning Check isOwned vs owned_copies "    
+
+        if (wait_days <= 0) and (isAvailable == False) and (owned_copies > 0) :
+            dbg = dbg  + " >>> Warning Check Not Available but wait days <= 0 "    
+                            
+        print(f"{dbg}{key} {title} : IsAvailable = {isAvailable} {availabilityType} available_copies = {available_copies} IsOwned= {isOwned} owned_copies = {owned_copies} {holds_count} held and wait time is around {wait_days} days  : lucky_day_copies = {lucky_day_copies} "  )
+
+
+    if (available_copies > 0 or isAvailable == True or availabilityType == "always" or lucky_day_copies > 0)  :
+        return 0
+    
+    if (owned_copies > 0 and wait_days > 0 ) :
+        return wait_days  
+
+    return NEVER_AVAILABLE
+
+def get_waitdays_description(media:Dict) -> str:
     try :
         sites = media.get("siteAvailabilities", {}) 
 
         if not sites :
            return "n/a"
 
-        title = get_media_title(media, include_subtitle=True)
+        title = media["title"]
 
-        smallestWaitDays = 999999 
+        smallestWaitDays = NEVER_AVAILABLE 
         
         for key, site in sites.items():
-            availabilityType = site.get("AvailabilityType" , "")
-            isAvailable      = site.get("isAvailable", False)
-            isOwned          = site.get("isOwned", False)
-            available_copies = site.get("AvailableCopies", 0)
-            holds_count      = site.get("holdsCount",0)
-            owned_copies     = site.get("ownedCopies", 0) 
-            wait_days        = site.get("estimatedWaitDays", 0) 
-            lucky_day_copies = site.get("luckyDayAvailableCopies", 0)
-
-            # Note. 
-            # Available Copies is zero for always available books, but isAvailable looks to be accurate
-            # Owned Copies is quite often zero even if isOwned is true , but in this case isOwned is probably wrong ,
-            #    so we ignore isOwned and assume the book is not available
-
-            # Wait days can be > 0 if we some books are available.
-
-
-            if CALIBRE_DEBUG :
-                dbg = ""
-
-                # Test assumptions
-
-                if (isOwned == False) and (owned_copies > 0 ) :
-                   dbg = dbg  + " >>> Warning Check isOwned vs owned_copies "    
-
-                if (wait_days <= 0) and (isAvailable == False) and (owned_copies > 0) :
-                   dbg = dbg  + " >>> Warning Check Not Available but wait days <= 0 "    
-                                    
-                print(f"{dbg}{key} {title} : IsAvailable = {isAvailable} {availabilityType} available_copies = {available_copies} IsOwned= {isOwned} owned_copies = {owned_copies} {holds_count} held and wait time is around {wait_days} days  : lucky_day_copies = {lucky_day_copies} "  )
-
+            wait_days = get_waitdays_integer(title, key , site)
 
             # If any site has a copy available then we can return immediately (no need to check other site)
-            if (available_copies > 0 or isAvailable == True or availabilityType == "always" or lucky_day_copies > 0)  :
-                return  ""
-            
-            if (owned_copies > 0 and wait_days > 0 and wait_days < smallestWaitDays) :
+            if wait_days == 0:
+                return "" 
+
+            if (wait_days < smallestWaitDays) :
                 smallestWaitDays = wait_days
                     
-        if (smallestWaitDays == 999999) :
+        if (smallestWaitDays == NEVER_AVAILABLE) :
             return "n/a" 
        
         return smallestWaitDays
@@ -741,6 +758,7 @@ class LibbyHoldsModel(LibbyModel):
         # DisplayRole, DisplaySortRole
         if role not in (Qt.DisplayRole, LibbyModel.DisplaySortRole):
             return None
+        
         if col == 0:
             if role == LibbyModel.DisplaySortRole:
                 return get_media_title(hold, for_sorting=True)
@@ -782,7 +800,14 @@ class LibbyHoldsModel(LibbyModel):
                 ):
                     return _("Delivering Later")
                 return _("Suspended Hold")
-            return _c("Yes") if hold.get("isAvailable", False) else _c("No")
+            if hold.get("isAvailable", False) :
+                return _c("Yes") 
+            
+            wait_days = get_waitdays_integer(hold["title"], "hold", hold) 
+            if (wait_days == NEVER_AVAILABLE) :
+                return _c("Never")
+            
+            return str(wait_days) + " " + _c("days") 
 
         return None
 
@@ -1064,7 +1089,7 @@ class LibbySearchModel(LibbyModel):
             cards = [c for c in self._cards if c["websiteId"] in website_ids]
         return sorted(cards, key=lambda c: c.get("counts", {}).get("loan", 0))
 
-    def sync(self, synced_state: Optional[Dict] = None):
+    def sync(self, synced_state: Optional[Dict] = None, clearOldResults = True):
         if not synced_state:
             synced_state = {}
         if "cards" in synced_state and "__libraries" in synced_state:
@@ -1075,7 +1100,8 @@ class LibbySearchModel(LibbyModel):
         if "search_results" not in synced_state:
             return
         self.beginResetModel()
-        self._rows = []
+        if (self._rows == None) or clearOldResults :
+            self._rows = []
         for r in synced_state["search_results"]:
             try:
                 if is_valid_type(r, include_provisional=True):
@@ -1143,6 +1169,8 @@ class LibbySearchModel(LibbyModel):
                 return media.get("publisher", {}).get("name")
             if col == 5:
                 return ", ".join([s["advantageKey"] for s in available_sites])
+            if col == 6: 
+                return get_series(media, truncate=False)
         # DisplayRole, DisplaySortRole
         if role not in (Qt.DisplayRole, LibbyModel.DisplaySortRole):
             return None
@@ -1191,12 +1219,23 @@ class LibbySearchModel(LibbyModel):
                         for media_format in media.get("formats", [])
                     ]
                 )
-        if col == 5:
+        if col == 5:    
+            sites = ", ".join([s["advantageKey"] for s in available_sites] )
+            if role == LibbyModel.DisplaySortRole :
+                return f"{1000-len(available_sites):03d} " + sites
+            else :
+                return truncate_for_display(sites, text_length=15 )
+        if col == 6:
+            return get_series(media, truncate = role != LibbyModel.DisplaySortRole )
+        if col == 7:
+            waitdaysDesc = get_waitdays_description(media) 
             if role == LibbyModel.DisplaySortRole:
-                return len(available_sites)
-            return truncate_for_display(
-                ", ".join([s["advantageKey"] for s in available_sites]), text_length=15
-            )
+                # Ensure that n/a books are sorted to display last.
+                if (waitdaysDesc == 'n/a') : 
+                    return NEVER_AVAILABLE
+
+            return waitdaysDesc
+
         return None
 
 

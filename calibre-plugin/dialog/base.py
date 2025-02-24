@@ -727,12 +727,12 @@ class BaseDialogMixin(QDialog):
         self.hold_added.emit(job.result)
         self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
 
-    def get_available_sites(self, media, model: LibbyModel):
+    def get_available_sites(self, media, model: LibbyModel, showUnavailable = False):
         # Use by search
         available_sites = []
         for k, site in media.get("siteAvailabilities", {}).items():
             site["advantageKey"] = k
-            if site.get("ownedCopies") or site.get("isAvailable"):
+            if showUnavailable or site.get("ownedCopies") or site.get("isAvailable"):
                 _card = next(
                     iter(model.get_cards_for_library_key(site["advantageKey"])),
                     None,

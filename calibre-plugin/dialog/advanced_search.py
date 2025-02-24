@@ -10,20 +10,27 @@
 # Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
 #
 from threading import Lock
-from typing import Dict, List
+from typing import Dict, List, Optional
+from datetime import datetime
 
-from calibre.constants import DEBUG
+from calibre.constants import DEBUG, config_dir 
+
 from qt.core import (
     QAbstractItemView,
     QButtonGroup,
+    # QComboBox,
+    QFileDialog,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
+    QLabel, 
     QLineEdit,
     QRadioButton,
+    QSpinBox,
     QThread,
     QWidget,
     Qt,
+ 
 )
 
 from .base_search import SearchBaseDialog
@@ -48,6 +55,8 @@ from ..overdrive import LibraryMediaSearchParams
 from ..utils import PluginImages
 from ..workers import OverDriveLibraryMediaSearchWorker
 
+from .. import PLUGIN_NAME, PLUGINS_FOLDER_NAME
+
 # noinspection PyUnreachableCode
 if False:
     load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
@@ -58,6 +67,9 @@ load_translations()
 class AdvancedSearchDialogMixin(SearchBaseDialog):
     def __init__(self, *args):
         super().__init__(*args)
+
+        self.maximum_number_of_pages = 0 
+        self.current_page_no = 1
 
         self._lib_search_threads: List[QThread] = []
         self._lib_search_result_sets: Dict[str, List[Dict]] = {}
@@ -78,21 +90,25 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         # Title Query textbox
         self.adv_query_txt = QLineEdit(self)
         self.adv_query_txt.setClearButtonEnabled(True)
+        self.adv_query_txt.textChanged.connect(self.re_enable_search)
         form_fields_layout.addRow(_("Query"), self.adv_query_txt)
 
         # Title Query textbox
         self.title_txt = QLineEdit(self)
         self.title_txt.setClearButtonEnabled(True)
+        self.title_txt.textChanged.connect(self.re_enable_search)
         form_fields_layout.addRow(_c("Title"), self.title_txt)
 
         # Creator Query textbox
         self.creator_txt = QLineEdit(self)
         self.creator_txt.setClearButtonEnabled(True)
+        self.creator_txt.textChanged.connect(self.re_enable_search)
         form_fields_layout.addRow(_c("Author"), self.creator_txt)
 
         # Identifier Query textbox
         self.identifier_txt = QLineEdit(self)
         self.identifier_txt.setClearButtonEnabled(True)
+        self.identifier_txt.textChanged.connect(self.re_enable_search)
         form_fields_layout.addRow(_("ISBN"), self.identifier_txt)
 
         rb_layout_spacing = 10
@@ -147,17 +163,30 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             self.subject_rb_layout.addWidget(rb)
         form_fields_layout.addRow(_("Subject"), self.subject_rb_layout)
 
+   
+        buttons_layout = QFormLayout()
+        buttons_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        buttons_layout.setHorizontalSpacing(20)
+        adv_search_widget.layout.addLayout(
+            buttons_layout, widget_row_pos,   self.view_hspan - 1, 1, 1
+        )
+
         # Search button
-        self.adv_search_btn = DefaultQPushButton(
-            _c("Search"), self.resources[PluginImages.Search], self
-        )
+        self.adv_search_btn = DefaultQPushButton(_c("Search"), self.resources[PluginImages.Search], self )
         self.adv_search_btn.clicked.connect(self.adv_search_btn_clicked)
-        adv_search_widget.layout.addWidget(
-            self.adv_search_btn,
-            widget_row_pos,
-            self.view_hspan - 1,
-            alignment=Qt.AlignTop,
-        )
+        buttons_layout.addRow(self.adv_search_btn)
+
+        # Clear button
+        self.adv_clear_btn = DefaultQPushButton(_c("Clear"), self.resources[PluginImages.Refresh], self )
+        self.adv_clear_btn.clicked.connect(self.adv_clear_btn_clicked)
+        buttons_layout.addRow(self.adv_clear_btn)
+
+        self.load_results_btn = DefaultQPushButton(_c("Load"), self.resources[PluginImages.ExternalLink], self )
+        buttons_layout.addRow(self.load_results_btn)
+
+        self.save_results_btn = DefaultQPushButton(_c("Save"), self.resources[PluginImages.ExternalLink], self )
+        buttons_layout.addRow(self.save_results_btn)
+       
         widget_row_pos += 1
 
         self.adv_search_model = LibbySearchModel(None, [], self.db)
@@ -165,6 +194,8 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             self, model=self.adv_search_model
         )
         self.adv_search_proxy_model.setSourceModel(self.adv_search_model)
+        self.load_results_btn.clicked.connect(self.loadRows)
+        self.save_results_btn.clicked.connect(self.saveRows)
 
         # The main search results list
         self.adv_search_results_view = DefaultQTableView(
@@ -242,13 +273,14 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.empty_book_btn.clicked.connect(self.adv_search_empty_book_btn_clicked)
         adv_search_widget.layout.addWidget(self.empty_book_btn, widget_row_pos, self.view_hspan - 3)
 
-        # set last 2 col's min width (buttons)
-        for i in (1, 2):
+        # set last 3 col's min width (buttons)
+        for i in (1 ,2, 3) :
             adv_search_widget.layout.setColumnMinimumWidth(
                 adv_search_widget.layout.columnCount() - i, self.min_button_width
             )
-        for col_num in range(0, adv_search_widget.layout.columnCount() - 2):
+        for col_num in range(0, adv_search_widget.layout.columnCount() - 3):
             adv_search_widget.layout.setColumnStretch(col_num, 1)
+
 
         self.adv_search_tab_index = self.add_tab(
             adv_search_widget, _("Advanced Search")
@@ -331,9 +363,30 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             if t.isRunning():
                 return True
         return False
+    
+    def re_enable_search(self) :
+        self.adv_search_btn.setText(_c("Search"))
+        self.adv_search_btn.setEnabled(True)
+        self.current_page_no = 1
+    
+    def adv_clear_btn_clicked(self) :
+        self.adv_query_txt.clear()
+        self.title_txt.clear()
+        self.creator_txt.clear()
+        self.identifier_txt.clear()
+        self.adv_search_model.sync({"search_results": []})
+        self.availability_all_rb.setChecked(True)
+        self.media_all_rb.setChecked(True)
+        self.subject_all_rb.setChecked(True)
+        self.re_enable_search()
+
 
     def adv_search_btn_clicked(self):
-        self.adv_search_model.sync({"search_results": []})
+        if self.current_page_no <= 1 :
+            self.adv_search_model.sync({"search_results": []}, True)
+
+        self.maximum_number_of_pages = 0
+        
         self.adv_search_results_view.sortByColumn(-1, Qt.AscendingOrder)
         self._reset_borrow_hold_buttons()
         if self._has_running_search():
@@ -385,6 +438,8 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             media_type=media_type,
             subject_id=subject_id,
             per_page=PREFS[PreferenceKeys.SEARCH_RESULTS_MAX],
+            page=self.current_page_no
+
         )
         if query.is_empty():
             return
@@ -403,6 +458,8 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self._lib_search_threads = []
         self._lib_search_result_sets = {}
 
+      
+
         for library_key in library_keys:
             search_thread = self._get_adv_search_thread(
                 self.overdrive_client, library_key, query
@@ -419,8 +476,48 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.adv_search_btn.setFocus(Qt.OtherFocusReason)
         self.adv_search_btn.animateClick()
 
-    def _process_search_results(self, library_key, search_items: List[Dict]):
+    def _process_search_results(self, library_key, results : Optional[Dict] ):
         with self.lock:
+            print(f"Type of results = {type(results)}")
+            if results == None :
+                search_items = []
+                totalItems = 0
+                totalItems2 = 0
+                lastPageNo = 0
+            else :
+                search_items = results.get("items", [])
+
+                noPerPage = PREFS[PreferenceKeys.SEARCH_RESULTS_MAX]
+                print(f'Items {len(search_items)} vs {noPerPage}')
+               
+
+                try :
+                    totalItems = results["facets"]["availability"]["items"][0]["totalItems"]
+                except Exception as e1:
+                    try :
+                        totalItems = results["facets"]["availability"]["items"][1]["totalItems"]
+                    except Exception as e2:
+                        print("")
+                        print(e2)
+                        try :
+                            print(f'item[0] = {results["facets"]["availability"]["items"]}')
+                        except Exception as e3:
+                            print(e3)
+                        totalItems = 0
+                                 
+                try :
+                    totalItems2 = results["totalItems"]
+                    print(f'item[3] = {totalItems2}')
+                    lastPageNo = results["links"]["last"]["page"]
+                    print(f'lastPageNo = {lastPageNo}')
+
+                    if (lastPageNo > self.maximum_number_of_pages) :
+                        self.maximum_number_of_pages = lastPageNo
+                except Exception as e3:
+                    print(e3)
+                    
+
+
             self._lib_search_result_sets[library_key] = search_items
             found_library_keys = self._lib_search_result_sets.keys()
             if len(found_library_keys) != len(self._lib_search_threads):
@@ -436,12 +533,13 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                 )
                 return
 
-            self.adv_search_btn.setText(_c("Search"))
-            self.adv_search_btn.setEnabled(True)
-            self.unsetCursor()
+        
             self.status_bar.clearMessage()
             combined_search_results: Dict[str, Dict] = {}
+            
             for lib_key, result_items in self._lib_search_result_sets.items():
+                print (lib_key + " " + str(len(result_items)))
+
                 for item_rank, item in enumerate(result_items, start=1):
                     site_availability = {}
                     for k in (
@@ -472,6 +570,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                     item.setdefault("__item_ranks", [])
                     item.setdefault("formats", [])
                     title_id = item["id"]
+                    print (str(item_rank) + " " + title_id)
                     combined_search_results.setdefault(title_id, item)
                     # merge site availabilities
                     combined_search_results[title_id]["siteAvailabilities"][
@@ -495,15 +594,45 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                     1 / len(r["__item_ranks"]),
                 ),
             )
-            self.status_bar.showMessage(
-                ngettext(
-                    "{n} result found",
-                    "{n} results found",
-                    len(ordered_search_result_items),
-                ).format(n=len(ordered_search_result_items)),
-                5000,
-            )
-            self.adv_search_model.sync({"search_results": ordered_search_result_items})
+
+            noOfResults = len(ordered_search_result_items)
+            per_page=PREFS[PreferenceKeys.SEARCH_RESULTS_MAX]
+
+            if (self.maximum_number_of_pages > 1 ) : 
+                if (self.current_page_no < self.maximum_number_of_pages) :
+                    self.current_page_no = self.current_page_no+1
+                    self.adv_search_btn.setText(_c("More")) 
+                    self.adv_search_btn.setEnabled(True)
+                    self.adv_search_btn.setToolTip(_c("Get Page") + f" {self.current_page_no} " + _c("of") + f" {self.maximum_number_of_pages}")
+                else :
+                    self.adv_search_btn.setText(_c("No more"))
+                    self.adv_search_btn.setToolTip("")
+                    self.adv_search_btn.setEnabled(True)
+                
+            else :
+                self.adv_search_btn.setText(_c("Search"))
+                self.adv_search_btn.setToolTip("")                
+                self.adv_search_btn.setEnabled(True)
+
+            self.adv_search_model.sync({"search_results": ordered_search_result_items}, False)
+            print(f"Synced : {self.adv_search_model.rowCount()} of {totalItems}")
+
+            noOfResults = self.adv_search_model.rowCount()
+
+            self.unsetCursor()
+
+            if totalItems == 1 and noOfResults == 1 :
+                message = _c("1 result found")
+            else :
+                message =  _c("{n} of {totalItems} results found {totalItems2} {lastPageNo}").format(n=noOfResults, totalItems=totalItems , totalItems2=totalItems2, lastPageNo = lastPageNo )
+
+            message = ngettext("{n} result found", "{n} results found", noOfResults, ).format(n=noOfResults)
+          
+
+            self.status_bar.showMessage(message)
+               
+            
+
 
     def _get_adv_search_thread(
         self, overdrive_client, library_key: str, query: LibraryMediaSearchParams
@@ -518,20 +647,19 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
         def done(lib_key: str, results: Dict):
             thread.quit()
-            self._process_search_results(lib_key, results.get("items", []))
+            self._process_search_results(lib_key, results) # results.get("items", []))
 
         def errored_out(lib_key: str, err: Exception):
             thread.quit()
             self.logger.warning(
                 "Error encountered during search (%s): %s", lib_key, err
             )
-            self.gui.status_bar.show_message(
-                _("Error encountered during search ({library}): {error}").format(
+            errorMessage = _("Error encountered during search ({library}): {error}").format(
                     library=lib_key, error=str(err)
-                ),
-                5000,
-            )
-            self._process_search_results(lib_key, [])
+                )
+            self._process_search_results(lib_key, None)
+            self.status_bar.showMessage(errorMessage)
+            self.gui.status_bar.show_message(errorMessage ,5000)
 
         worker.finished.connect(lambda lib_key, results: done(lib_key, results))
         worker.errored.connect(lambda lib_key, err: errored_out(lib_key, err))
@@ -545,3 +673,83 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
     def adv_search_empty_book_btn_clicked(self):
         self.empty_book_btn_clicked(self.empty_hold_callback, self.adv_search_results_view.selectionModel() , self.adv_search_model) 
+
+    def getSearchResultsFolder(self) :
+        from pathlib import Path
+        PLUGIN_DIR = Path(config_dir, PLUGINS_FOLDER_NAME)
+        documents_folder= PLUGIN_DIR.joinpath(f"{PLUGIN_NAME} Search Results")
+        if not documents_folder.exists():
+            documents_folder.mkdir(parents=True, exist_ok=True)
+        return str(documents_folder)
+
+    
+    def saveRows(self) :
+        import json
+     
+        fileName,_ = QFileDialog.getSaveFileName(
+            None,
+            "Save ", 
+            self.getSearchResultsFolder(), 
+            "Json Files (*.json)"
+        )        
+
+        if fileName:
+            data =  { }
+            data["Type"]    = f"{PLUGIN_NAME} Search Results"
+            data["Date"]    = datetime.now().isoformat()
+            data["Results"] = self.adv_search_model._rows
+
+            print(f"Type of data = {type(data)}")
+            jsonStr = json.dumps(data, indent=4)
+            print(f"Type of jsonStr = {type(jsonStr)}")
+
+            with open(fileName, "w") as text_file:
+                print("Saving")
+                text_file.write(jsonStr)
+                print("Saved")
+    
+    def loadRows(self) :
+        import json
+
+        fileName,_ = QFileDialog.getOpenFileName(
+            None,
+            "Select a File", 
+            self.getSearchResultsFolder(), 
+            "Json Files (*.json);"
+        )
+
+        if not fileName :
+            return
+
+        from calibre.gui2.widgets import BusyCursor
+        from calibre.gui2 import question_dialog, error_dialog
+
+        self.adv_search_model.beginResetModel()
+        self.adv_search_model._rows = []
+        self.adv_search_model.endResetModel()
+
+        data = [] 
+        with open(fileName, "r") as file: 
+            with BusyCursor():
+                data = json.load(file) 
+            
+            print(f"Type of data = {type(data)}")
+            if (not isinstance(data, Dict)) or (data.get("Type") != f"{PLUGIN_NAME} Search Results" ) or not data.get("Results") :
+                error_dialog(None, _c("Invalid format"), _c("This file does not appear to be in the correct format ."), show=True, show_copy_button=False)
+                return
+            
+            if data.get("Date") :
+                age_of_results = datetime.now() -  datetime.fromisoformat(data["Date"])
+                if (age_of_results.days > 14) :
+
+                    if not question_dialog(self,  _c("Stale results") ,
+                        '<p>' + _c('These results are {0} days old and hence availabilty and wait times will be incorrect.').format(age_of_results.days) + 
+                        '<p>' + _c('Are you sure you want to continue?')   
+                        ) :
+                        return                        
+
+            with BusyCursor():
+                self.adv_search_model.beginResetModel()
+                self.adv_search_model._rows = data["Results"]
+                self.adv_search_model.endResetModel()
+            

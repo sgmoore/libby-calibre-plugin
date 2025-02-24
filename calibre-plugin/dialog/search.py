@@ -154,12 +154,12 @@ class SearchDialogMixin(SearchBaseDialog):
         self.empty_book_btn.clicked.connect(self.search_empty_book_btn_clicked)
         search_widget.layout.addWidget(self.empty_book_btn, widget_row_pos, self.view_hspan - 3)
         
-        # set last 2 col's min width (buttons)
-        for i in (1, 2):
+        # set last 3 col's min width (buttons)
+        for i in (1 ,2, 3) :
             search_widget.layout.setColumnMinimumWidth(
                 search_widget.layout.columnCount() - i, self.min_button_width
             )
-        for col_num in range(0, search_widget.layout.columnCount() - 2):
+        for col_num in range(0, search_widget.layout.columnCount() - 3):
             search_widget.layout.setColumnStretch(col_num, 1)
         self.search_tab_index = self.add_tab(search_widget, _c("Search"))
         self.last_borrow_action_changed.connect(self.rebind_search_borrow_btn)
