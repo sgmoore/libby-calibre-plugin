@@ -18,7 +18,7 @@ from .. import DEMO_MODE
 from ..compat import _c
 from ..config import PREFS, PreferenceKeys, BorrowActions
 from ..libby import LibbyClient
-from ..models import get_media_title, truncate_for_display
+from ..models import get_media_title, truncate_for_display, get_waitdays_integer 
 from ..utils import PluginImages, obfuscate_name
 
 # noinspection PyUnreachableCode
@@ -172,13 +172,27 @@ class SearchBaseDialog(BaseDialogMixin):
         if hold_sites:
             hold_menu = QMenu()
             hold_menu.setToolTipsVisible(True)
+
+            title = media.get("title")
+            print("")
+            # print(f"Creating Hold site menu for {media}")
+            print(f"Creating Hold site menu for {title}")
+
             for site in hold_sites:
+                libraryName = site["advantageKey"] 
                 cards = model.get_cards_for_library_key(site["advantageKey"])
                 for card in cards:
+
+                    wait_days_old = site.get("estimatedWaitDays", 0) 
+                    wait_days = get_waitdays_integer(title , libraryName , site)
+                    if (wait_days_old != wait_days) :
+                         print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  Wait days different {wait_days} <> {wait_days_old} for {title} {libraryName}")
+
                     card_action = hold_menu.addAction(
                         QIcon(self.get_card_pixmap(site["__library"])),
+
                         truncate_for_display(
-                            f'{card["advantageKey"]}: {card.get("cardName") or ""}',
+                            f'ETA {wait_days} days from {card["advantageKey"]}: {card.get("cardName") or ""}',
                             font=hold_menu.font(),
                         ),
                     )
@@ -213,6 +227,9 @@ class SearchBaseDialog(BaseDialogMixin):
                     card_action.triggered.connect(
                         lambda checked, m=media, c=card: self.create_hold(m, c)
                     )
+            
+            print(f"Finished Creating Hold site")
+            print("")
             hold_btn.setEnabled(True)
             hold_btn.hold_menu = hold_menu
             hold_btn.setMenu(hold_menu)
@@ -230,7 +247,7 @@ class SearchBaseDialog(BaseDialogMixin):
 
         menu = QMenu(self)
         menu.setToolTipsVisible(True)
-        available_sites = self.get_available_sites(media, model)
+        available_sites = self.get_available_sites(media, model, True)
         view_in_libby_menu = QMenu(_("View in Libby"))
         view_in_libby_menu.setIcon(self.resources[PluginImages.ExternalLink])
         view_in_libby_menu.setToolTipsVisible(True)
