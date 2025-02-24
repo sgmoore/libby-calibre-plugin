@@ -1,5 +1,15 @@
 # Changelog
 
+Version 0.2.101 - 2025-02-24 Beta 
+ - New: Added columns for series and Wait days to search screen
+ - New: Added wait days to the holds tab
+ - New: Allows you to download more search results if the number exceeds SEARCH_RESULTS_MAX 
+ - New: You can now create 'empty' entries in calibre from the Holds & Search tabs (see https://github.com/sgmoore/libby-calibre-plugin/discussions/3)
+ - New: Added option to save and reload search results.
+ - New: Added ETA to the hold submenu (see https://github.com/sgmoore/libby-calibre-plugin/issues/7)
+ - Fix: Fixed issue with saving width after resizing.
+ 
+ 
 Version 0.2.0 - 2024-11-04  This version is now considered the official plugin
 - Fix: Renamed Download button to 'Open in libbyapp.com' as it no longer downloads anything
 - Fix: Amended setup procedure to take a token or sonos setup code.
