@@ -18,15 +18,12 @@ from calibre.constants import DEBUG, config_dir
 from qt.core import (
     QAbstractItemView,
     QButtonGroup,
-    # QComboBox,
     QFileDialog,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
-    QLabel, 
     QLineEdit,
     QRadioButton,
-    QSpinBox,
     QThread,
     QWidget,
     Qt,
@@ -479,7 +476,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
     def _process_search_results(self, library_key, results : Optional[Dict] ):
         with self.lock:
             print(f"Type of results = {type(results)}")
-            if results == None :
+            if results is None :
                 search_items = []
                 totalItems = 0
                 totalItems2 = 0
@@ -493,7 +490,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
                 try :
                     totalItems = results["facets"]["availability"]["items"][0]["totalItems"]
-                except Exception as e1:
+                except Exception : 
                     try :
                         totalItems = results["facets"]["availability"]["items"][1]["totalItems"]
                     except Exception as e2:
@@ -596,7 +593,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             )
 
             noOfResults = len(ordered_search_result_items)
-            per_page=PREFS[PreferenceKeys.SEARCH_RESULTS_MAX]
+            # per_page=PREFS[PreferenceKeys.SEARCH_RESULTS_MAX]
 
             if (self.maximum_number_of_pages > 1 ) : 
                 if (self.current_page_no < self.maximum_number_of_pages) :

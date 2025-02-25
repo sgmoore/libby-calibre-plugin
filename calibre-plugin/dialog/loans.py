@@ -48,7 +48,7 @@ from ..models import (
     get_media_title,
     truncate_for_display,
 )
-from ..overdrive import OverDriveClient
+# from ..overdrive import OverDriveClient
 from ..utils import PluginImages
 from ..workers import LibbyFulfillLoanWorker
 
@@ -483,7 +483,7 @@ class LoansDialogMixin(BaseDialogMixin):
         # Heavily referenced from
         # https://github.com/kovidgoyal/calibre/blob/58c609fa7db3a8df59981c3bf73823fa1862c392/src/calibre/gui2/ebook_download.py#L127-L152
 
-        book_id, mi = self.match_existing_book(self.loans_model , loan, library, format_id)
+        book_id, mi = self.match_existing_book(loan, library, format_id)
         if mi and book_id:
             self.logger.debug("Matched existing empty book: %s", mi.title)
 

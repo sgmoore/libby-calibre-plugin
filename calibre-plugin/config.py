@@ -39,8 +39,8 @@ from qt.core import (
     QWidget,
     Qt,
     QTimer,
-    QRegularExpressionValidator,
-    QRegularExpression,
+    # QRegularExpressionValidator,
+    # QRegularExpression,
 )
 
 from . import DEMO_MODE, PLUGIN_NAME, PLUGINS_FOLDER_NAME, logger

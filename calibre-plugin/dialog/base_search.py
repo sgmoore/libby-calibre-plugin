@@ -175,7 +175,6 @@ class SearchBaseDialog(BaseDialogMixin):
 
             title = media.get("title")
             print("")
-            # print(f"Creating Hold site menu for {media}")
             print(f"Creating Hold site menu for {title}")
 
             for site in hold_sites:
@@ -228,7 +227,7 @@ class SearchBaseDialog(BaseDialogMixin):
                         lambda checked, m=media, c=card: self.create_hold(m, c)
                     )
             
-            print(f"Finished Creating Hold site")
+            print("Finished Creating Hold site menu")
             print("")
             hold_btn.setEnabled(True)
             hold_btn.hold_menu = hold_menu

@@ -20,7 +20,6 @@ from calibre.utils.date import dt_as_local, format_date
 from calibre.utils.icu import lower as icu_lower
 from qt.core import (
     QAbstractTableModel,
-    QFileDialog,
     QFont,
     QModelIndex,
     QSortFilterProxyModel,
@@ -77,13 +76,13 @@ def get_media_title(
 def get_series(book:Dict , truncate:bool) -> str:
     try :
         ds = book.get("detailedSeries")
-        if (ds != None) :
+        if (ds is not None) :
             seriesName = ds.get("seriesName")
             if truncate :
                 seriesName = truncate_for_display(seriesName)
             
             seriesNo = ds.get("readingOrder")
-            if seriesNo == None :
+            if seriesNo is None :
                 return seriesName 
 
             width = 2 # Are there any series that have more than 99 books?
@@ -121,16 +120,16 @@ def get_waitdays_integer(title:str , key:str , dict:Dict) -> int:
 
         # Test assumptions
 
-        if (isOwned == False) and (owned_copies > 0 ) :
+        if (not isOwned) and (owned_copies > 0 ) :
             dbg = dbg  + " >>> Warning Check isOwned vs owned_copies "    
 
-        if (wait_days <= 0) and (isAvailable == False) and (owned_copies > 0) :
+        if (wait_days <= 0) and (not isAvailable) and (owned_copies > 0) :
             dbg = dbg  + " >>> Warning Check Not Available but wait days <= 0 "    
                             
         print(f"{dbg}{key} {title} : IsAvailable = {isAvailable} {availabilityType} available_copies = {available_copies} IsOwned= {isOwned} owned_copies = {owned_copies} {holds_count} held and wait time is around {wait_days} days  : lucky_day_copies = {lucky_day_copies} "  )
 
 
-    if (available_copies > 0 or isAvailable == True or availabilityType == "always" or lucky_day_copies > 0)  :
+    if (available_copies > 0 or isAvailable or availabilityType == "always" or lucky_day_copies > 0)  :
         return 0
     
     if (owned_copies > 0 and wait_days > 0 ) :
@@ -162,7 +161,7 @@ def get_waitdays_description(media:Dict) -> str:
         if (smallestWaitDays == NEVER_AVAILABLE) :
             return "n/a" 
        
-        return smallestWaitDays
+        return str(smallestWaitDays)
 
     except Exception as err:
         print(f"Error calculating waitdays {err}")
@@ -1098,7 +1097,7 @@ class LibbySearchModel(LibbyModel):
         if "search_results" not in synced_state:
             return
         self.beginResetModel()
-        if (self._rows == None) or clearOldResults :
+        if (self._rows is None) or clearOldResults :
             self._rows = []
         for r in synced_state["search_results"]:
             try:
