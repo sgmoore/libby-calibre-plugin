@@ -851,6 +851,18 @@ class LibbyHoldsSortFilterModel(LibbySortFilterModel):
             or self.filter_text in library
         )
 
+    def lessThan(self, source_left:QModelIndex, source_right:QModelIndex) -> bool:
+        # Available is numeric. Do not sort as a string.
+        if source_left.column() == 5:
+            wait_left = self.get_wait(source_left)
+            wait_right = self.get_wait(source_right)
+            return wait_left < wait_right
+
+        return super().lessThan(source_left, source_right)
+
+    def get_wait(self, model_index:QModelIndex) -> int:
+        data = model_index.data(Qt.UserRole)
+        return get_waitdays_integer("", "", data)
 
 class LibbyCardsModel(LibbyModel):
     """
