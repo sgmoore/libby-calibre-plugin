@@ -790,6 +790,10 @@ class LibbyHoldsModel(LibbyModel):
                 return str(hold_format)
             return _(LOAN_FORMAT_TRANSLATION.get(hold_format, hold_format))
         if col == 5:
+            wait_days = get_waitdays_integer(hold["title"], "hold", hold)
+            if role == LibbyModel.DisplaySortRole:
+                return wait_days
+
             if is_suspended:
                 if (
                     hold.get("redeliveriesRequestedCount", 0) > 0
@@ -800,7 +804,6 @@ class LibbyHoldsModel(LibbyModel):
             if hold.get("isAvailable", False) :
                 return _c("Yes") 
             
-            wait_days = get_waitdays_integer(hold["title"], "hold", hold) 
             if (wait_days == NEVER_AVAILABLE) :
                 return _c("Never")
             
@@ -851,18 +854,6 @@ class LibbyHoldsSortFilterModel(LibbySortFilterModel):
             or self.filter_text in library
         )
 
-    def lessThan(self, source_left:QModelIndex, source_right:QModelIndex) -> bool:
-        # Available is numeric. Do not sort as a string.
-        if source_left.column() == 5:
-            wait_left = self.get_wait(source_left)
-            wait_right = self.get_wait(source_right)
-            return wait_left < wait_right
-
-        return super().lessThan(source_left, source_right)
-
-    def get_wait(self, model_index:QModelIndex) -> int:
-        data = model_index.data(Qt.UserRole)
-        return get_waitdays_integer("", "", data)
 
 class LibbyCardsModel(LibbyModel):
     """
