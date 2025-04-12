@@ -790,6 +790,10 @@ class LibbyHoldsModel(LibbyModel):
                 return str(hold_format)
             return _(LOAN_FORMAT_TRANSLATION.get(hold_format, hold_format))
         if col == 5:
+            wait_days = get_waitdays_integer(hold["title"], "hold", hold)
+            if role == LibbyModel.DisplaySortRole:
+                return wait_days
+
             if is_suspended:
                 if (
                     hold.get("redeliveriesRequestedCount", 0) > 0
@@ -800,7 +804,6 @@ class LibbyHoldsModel(LibbyModel):
             if hold.get("isAvailable", False) :
                 return _c("Yes") 
             
-            wait_days = get_waitdays_integer(hold["title"], "hold", hold) 
             if (wait_days == NEVER_AVAILABLE) :
                 return _c("Never")
             
