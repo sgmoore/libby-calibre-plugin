@@ -373,7 +373,8 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.identifier_txt.clear()
         self.adv_search_model.sync({"search_results": []})
         self.availability_all_rb.setChecked(True)
-        self.media_all_rb.setChecked(True)
+        if PREFS[PreferenceKeys.INCL_NONDOWNLOADABLE_TITLES]:
+            self.media_all_rb.setChecked(True)
         self.subject_all_rb.setChecked(True)
         self.re_enable_search()
 

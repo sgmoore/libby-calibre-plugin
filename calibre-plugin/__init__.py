@@ -23,7 +23,7 @@ if False:
 
 load_translations()
 
-__version__ = (0, 2, 101)
+__version__ = (0, 2, 102)
 PLUGIN_NAME = "overdrive_libby"
 PLUGIN_ICON = "images/plugin.svg"
 PLUGINS_FOLDER_NAME = "plugins"

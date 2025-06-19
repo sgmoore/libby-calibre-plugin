@@ -1,5 +1,8 @@
 # Changelog
 
+Version 0.2.102 - 2025-06-19 Beta 
+ - Fix: Fixed error clicking the "Clear" button in "Advanced Search" tab results if "Include titles without downloadable formats" is not enabled
+
 Version 0.2.101 - 2025-02-24 Beta 
  - New: Added columns for series and Wait days to search screen
  - New: Added wait days to the holds tab
