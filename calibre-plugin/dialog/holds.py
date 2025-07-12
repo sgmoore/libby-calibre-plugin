@@ -201,13 +201,25 @@ class HoldsDialogMixin(BaseDialogMixin):
         self.holds_borrow_btn.setEnabled(True)
         self.holds_model.sync(value)
 
+    def can_hold_be_borrowed(self, hold):
+        if hold.get("isAvailable", False) :
+            return True 
+        ldc = hold.get("luckyDayAvailableCopies", 0)
+        title = hold.get("title")
+        print(f"{title} has {ldc} Lucky Day copies available")            
+        if hold.get("luckyDayAvailableCopies", 0) > 0:
+            return True
+        
+        return False
+                    
+
     def holds_model_changed(self):
         available_holds_count = 0
         for r in range(self.holds_model.rowCount()):
             hold = self.holds_model.index(r, 0).data(Qt.UserRole)
             if not is_valid_type(hold):
                 continue
-            if hold.get("isAvailable", False):
+            if self.can_hold_be_borrowed(hold) :
                 available_holds_count += 1
         if available_holds_count:
             self.tabs.setTabText(
@@ -257,9 +269,9 @@ class HoldsDialogMixin(BaseDialogMixin):
         for index in indices:
             hold = index.data(Qt.UserRole)
             card = self.holds_model.get_card(hold["cardId"])
-            self.holds_borrow_btn.setEnabled(hold.get("isAvailable", False))
+            self.holds_borrow_btn.setEnabled(self.can_hold_be_borrowed(hold))
             owned_copies = hold.get("ownedCopies", 0)
-            if hold.get("estimatedWaitDays") and not hold.get("isAvailable", False):
+            if hold.get("estimatedWaitDays") and not self.can_hold_be_borrowed(hold):
                 self.status_bar.showMessage(
                     " ".join(
                         [
@@ -282,7 +294,7 @@ class HoldsDialogMixin(BaseDialogMixin):
                     3000,
                 )
                 continue
-            elif hold.get("isAvailable"):
+            elif self.can_hold_be_borrowed(hold):
                 # check card loan limit
                 loan_limit = card.get("limits", {}).get("loan", 0)
                 used_loan_limit = card.get("counts", {}).get("loan", 0)
@@ -584,8 +596,20 @@ class SuspendHoldDialog(QDialog):
             layout.setColumnMinimumWidth(r, self.parent().min_button_width)
         layout.setSizeConstraint(QLayout.SetFixedSize)
 
+    def can_hold_be_borrowed(self, hold):
+        if hold.get("isAvailable", False) :
+            return True 
+        ldc = hold.get("luckyDayAvailableCopies", 0)
+        title = hold.get("title")
+        print(f"SuspendHoldDialog {title} has {ldc} Lucky Day copies available")            
+        if hold.get("luckyDayAvailableCopies", 0) > 0:
+            return True
+        
+        return False
+            
+
     def _is_delivery_delay(self, hold):
-        if hold.get("isAvailable"):
+        if self.can_hold_be_borrowed(hold) :
             return True
         is_suspended = bool(hold.get("suspensionFlag") and hold.get("suspensionEnd"))
         if is_suspended and (
