@@ -34,6 +34,7 @@ from .libby import LibbyClient
 from .libby.client import LibbyFormats, LibbyMediaTypes
 from .overdrive import OverDriveClient
 from .utils import PluginColors, PluginImages, obfuscate_date, obfuscate_name
+from re import sub, split, IGNORECASE
 
 # noinspection PyUnreachableCode
 if False:
@@ -73,29 +74,59 @@ def get_media_title(
 
     return title
 
+class StaticCounter:
+    counter = 0  # Static counter (class variable)
+
+    @classmethod
+    def increment(cls):
+        cls.counter += 1
+        return cls.counter
+
+
 def get_series(book:Dict , truncate:bool) -> str:
     try :
-        ds = book.get("detailedSeries")
-        if (ds is not None) :
-            seriesName = ds.get("seriesName")
-            if truncate :
-                seriesName = truncate_for_display(seriesName)
-            
-            seriesNo = ds.get("readingOrder")
-            if seriesNo is None :
-                return seriesName 
-
-            width = 2 # Are there any series that have more than 99 books?
-            seriesNo = float(seriesNo)
-
-            if seriesNo.is_integer() :
-                return ( seriesName + " " + f"{int(seriesNo)}".rjust(width) + "  " )
-            else : 
-                return ( seriesName + " " +  f"{seriesNo}".rjust(width+2) )
-
+        return unsafe_get_series(book, truncate)
     except Exception as err:
         print(f"Error getting series {err}")
     return "" 
+    
+def unsafe_get_series(book:Dict , truncate:bool) -> str:
+    StaticCounter.increment()  
+
+    ds = book.get("detailedSeries")
+    if (ds is None) :
+        return "" 
+    
+    seriesName = ds.get("seriesName").strip()
+    if truncate :
+        seriesName = truncate_for_display(seriesName)
+    
+    seriesNo = ds.get("readingOrder")
+    if seriesNo is None or seriesNo == "" :
+        return seriesName 
+
+    if not seriesNo[0].isdigit() :
+        seriesNo = sub(r'Book |Volume ', '', seriesNo, flags=IGNORECASE)
+        
+        if seriesNo[0] == '.' and seriesNo[1].isdigit() :
+            seriesNo = "0" + seriesNo
+
+    first_integer = ""
+    rest = ""
+    pad1 = 0
+       
+    for i, char in enumerate(seriesNo):
+        if char.isdigit():
+            first_integer += char
+            pad1 = 3
+        else:
+            rest = seriesNo[i:]
+            break
+ 
+
+    return ( seriesName + " " + (first_integer.rjust(pad1) + rest).ljust(6, ' ')  )
+
+ 
 
 NEVER_AVAILABLE = 999999
 

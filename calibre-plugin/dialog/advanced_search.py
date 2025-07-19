@@ -27,6 +27,9 @@ from qt.core import (
     QThread,
     QWidget,
     Qt,
+    QHeaderView,
+    QMenu,
+    QMessageBox
  
 )
 
@@ -54,11 +57,21 @@ from ..workers import OverDriveLibraryMediaSearchWorker
 
 from .. import PLUGIN_NAME, PLUGINS_FOLDER_NAME
 
+from ..utils import Scrub
+
 # noinspection PyUnreachableCode
 if False:
     load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
 
 load_translations()
+
+def getSearchResultsFolder() :
+    from pathlib import Path
+    PLUGIN_DIR = Path(config_dir, PLUGINS_FOLDER_NAME)
+    documents_folder= PLUGIN_DIR.joinpath(f"{PLUGIN_NAME} Search Results")
+    if not documents_folder.exists():
+        documents_folder.mkdir(parents=True, exist_ok=True)
+    return str(documents_folder)
 
 
 class AdvancedSearchDialogMixin(SearchBaseDialog):
@@ -221,6 +234,9 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                 if col_index == 0
                 else QHeaderView_ResizeMode_ResizeToContents,
             )
+
+     
+
         adv_search_widget.layout.addWidget(
             self.adv_search_results_view,
             widget_row_pos,
@@ -229,6 +245,13 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             self.view_hspan,
         )
         widget_row_pos += 1
+
+
+        # Enable header context menu
+        horizontal_header.setContextMenuPolicy(Qt.CustomContextMenu)
+        horizontal_header.customContextMenuRequested.connect(self.header_context_menu)
+
+
 
         if hasattr(self, "search_tab_index"):
             self.toggle_advsearch_mode_btn = DefaultQPushButton(
@@ -290,6 +313,19 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.hold_added.connect(self.hold_added_advsearch)
         self.hold_removed.connect(self.hold_removed_advsearch)
 
+
+    # Normally the columns on the search results are re-sized automatically, but occasionally I have seen this fail, 
+    # so this is a last resort option to allowed you to resize them manually.
+    
+    def header_context_menu(self, position):
+        # Create a context menu
+        menu = QMenu()
+        action = menu.addAction("Allow Columns to be resized")
+        selected_action = menu.exec_(self.adv_search_results_view.horizontalHeader().mapToGlobal(position))
+        
+        if selected_action == action:
+            self.adv_search_results_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+ 
     def toggle_advsearch_mode_btn_clicked(self):
         if hasattr(self, "search_tab_index"):
             PREFS[PreferenceKeys.SEARCH_MODE] = SearchMode.BASIC
@@ -672,14 +708,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
     def adv_search_empty_book_btn_clicked(self):
         self.empty_book_btn_clicked(self.empty_hold_callback, self.adv_search_results_view.selectionModel() , self.adv_search_model) 
 
-    def getSearchResultsFolder(self) :
-        from pathlib import Path
-        PLUGIN_DIR = Path(config_dir, PLUGINS_FOLDER_NAME)
-        documents_folder= PLUGIN_DIR.joinpath(f"{PLUGIN_NAME} Search Results")
-        if not documents_folder.exists():
-            documents_folder.mkdir(parents=True, exist_ok=True)
-        return str(documents_folder)
-
+  
     
     def saveRows(self) :
         import json
@@ -687,7 +716,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         fileName,_ = QFileDialog.getSaveFileName(
             None,
             "Save ", 
-            self.getSearchResultsFolder(), 
+            getSearchResultsFolder(), 
             "Json Files (*.json)"
         )        
 
@@ -697,12 +726,15 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             data["Date"]    = datetime.now().isoformat()
             data["Results"] = self.adv_search_model._rows
 
-            print(f"Type of data = {type(data)}")
-            jsonStr = json.dumps(data, indent=4)
+            
+            print(f"Calling scrub_sensitive_data on type = {type(data)}")
+            # jsonStr = json.dumps(data, indent=4)
+            jsonStr = Scrub.scrub_sensitive_data(data , "Search Results" , self.logger )
+            
             print(f"Type of jsonStr = {type(jsonStr)}")
 
             with open(fileName, "w") as text_file:
-                print("Saving")
+                print(f"Saving {fileName}")
                 text_file.write(jsonStr)
                 print("Saved")
     
@@ -712,7 +744,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         fileName,_ = QFileDialog.getOpenFileName(
             None,
             "Select a File", 
-            self.getSearchResultsFolder(), 
+            getSearchResultsFolder(), 
             "Json Files (*.json);"
         )
 

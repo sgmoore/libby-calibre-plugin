@@ -80,3 +80,7 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+.gitleaks.toml
+gitleaks-report.json
+gitleaks_files.cmd
+gitleaks_repo.cmd
