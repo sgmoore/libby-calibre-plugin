@@ -26,6 +26,8 @@ from urllib.request import Request, build_opener
 from .common import pageable
 from .errors import ClientConnectionError
 
+from ..tools.CustomLogger import CustomLogger
+
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 (KHTML, like Gecko) "  # noqa
     "Version/14.0.2 Safari/605.1.15"
@@ -78,7 +80,7 @@ class LibraryMediaSearchParams:
         return ",".join([str(v).strip() for v in values])
 
     def to_dict(self) -> Dict:
-        result = {"page": max(1, self.page or 0), "perPage": max(1, self.per_page or 0)}
+        result : Dict[str, Union[int, str]] = {"page": max(1, self.page or 0), "perPage": max(1, self.per_page or 0)}
         if self.sort_by:
             result["sortBy"] = self.sort_by
         if self.formats:
@@ -111,13 +113,9 @@ class OverDriveClient(object):
         self,
         max_retries: int = 0,
         timeout: float = 30.0,
-        logger: Optional[logging.Logger] = None,
         **kwargs,
     ) -> None:
-        if not logger:
-            logger = logging.getLogger(__name__)
-        self.logger = logger
-
+        
         self.timeout = timeout
         self.max_retries = max_retries
         self.user_agent = kwargs.pop("user_agent", USER_AGENT)
@@ -167,7 +165,10 @@ class OverDriveClient(object):
             return res
 
         decoded_res = res.decode("utf8")
-        self.logger.debug("RES BODY: %s", decoded_res)
+
+        if CustomLogger.logger.level == logging.DEBUG:
+             CustomLogger.log_response(decoded_res , "OverDrive RES BODY:" )
+
         return decoded_res
 
     def send_request(
@@ -219,40 +220,33 @@ class OverDriveClient(object):
             if params == "":  # force post if empty string
                 data = "".encode("ascii")
             elif is_form:
-                data = urlencode(params).encode("ascii")
+                if isinstance(params, str) :
+                    raise TypeError(f"Attempting to pass parameters as string {params} to urlencode ")
+                else :
+                    data = urlencode(params).encode("ascii")
             else:
                 data = json.dumps(params, separators=(",", ":")).encode("ascii")
 
         req = Request(endpoint_url, data, headers=headers)
         if method:
-            req.get_method = (
+            req.get_method = (          # type: ignore[method-assign]
                 lambda: method.upper()  # pylint: disable=unnecessary-lambda
             )
 
         for attempt in range(0, self.max_retries + 1):
             try:
-                self.logger.debug("REQUEST: %s %s", req.get_method(), endpoint_url)
-                self.logger.debug(
-                    "REQ HEADERS: \n%s",
-                    "\n".join(["{}: {}".format(k, v) for k, v in req.headers.items()]),
-                )
-                if data:
-                    self.logger.debug("REQ BODY: \n%s", data)
+                CustomLogger.log_request(req, endpoint_url , data )
                 response = self.opener.open(req, timeout=self.timeout)
-            except HTTPError as e:
-                self.logger.debug("RESPONSE: %d %s", e.code, e.url)
-                self.logger.debug(
-                    "RES HEADERS: \n%s",
-                    "\n".join(["{}: {}".format(k, v) for k, v in e.info().items()]),
-                )
+            except HTTPError as e:            
+                CustomLogger.log_response_headers(e)
                 if (
                     attempt < self.max_retries and e.code >= 500
                 ):  # retry for server 5XX errors
                     # do nothing, try
-                    self.logger.warning(
+                    CustomLogger.logger.warning(
                         "Retrying due to %s: %s", e.__class__.__name__, str(e)
                     )
-                    self.logger.debug(self._read_response(e))
+                    CustomLogger.logger.debug(self._read_response(e))
                     continue
                 raise
 
@@ -266,7 +260,7 @@ class OverDriveClient(object):
             ) as connection_error:
                 if attempt < self.max_retries:
                     # do nothing, try
-                    self.logger.warning(
+                    CustomLogger.logger.warning(
                         "Retrying due to %s: %s",
                         connection_error.__class__.__name__,
                         str(connection_error),
@@ -277,12 +271,8 @@ class OverDriveClient(object):
                         connection_error.__class__.__name__, str(connection_error)
                     )
                 ) from connection_error
-
-            self.logger.debug("RESPONSE: %d %s", response.code, response.url)
-            self.logger.debug(
-                "RES HEADERS: \n%s",
-                "\n".join(["{}: {}".format(k, v) for k, v in response.info().items()]),
-            )
+            
+            CustomLogger.log_response_headers(response)
             if not decode_response:
                 return self._read_response(response, decode_response)
 

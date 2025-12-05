@@ -23,7 +23,6 @@ class OverDriveClientTests(BaseTests):
         self.client = OverDriveClient(
             max_retries=0,
             timeout=15,
-            logger=self.logger,
         )
 
     def test_media(self):

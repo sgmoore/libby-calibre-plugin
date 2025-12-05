@@ -31,6 +31,7 @@ from .errors import ClientConnectionError, ErrorHandler, ClientForbiddenError
 from .utils import StringEnum
 
 
+from ..tools.CustomLogger import CustomLogger
 class LibbyTagTypes(StringEnum):
     """
     Document tag behavior "types". Not currently used.
@@ -122,12 +123,8 @@ class LibbyClient(object):
         identity_token: Optional[str] = None,
         max_retries: int = 0,
         timeout: float = 30.0,
-        logger: Optional[logging.Logger] = None,
         **kwargs,
     ) -> None:
-        if not logger:
-            logger = logging.getLogger(__name__)
-        self.logger = logger
 
         self.timeout = timeout
         self.identity_token = identity_token
@@ -351,9 +348,10 @@ class LibbyClient(object):
         if not loan.get("renewableOn"):
             return False
         # Example: 2023-02-23T07:33:55Z
-        return LibbyClient.parse_datetime(loan["renewableOn"]) <= datetime.now(
-            tz=timezone.utc
-        )
+        renewableOnDate = LibbyClient.parse_datetime(loan["renewableOn"])
+        if (renewableOnDate is None) :
+            return False
+        return  renewableOnDate <= datetime.now(tz=timezone.utc)
 
     @staticmethod
     def libby_title_permalink(library_key: str, title_id: str) -> str:
@@ -417,19 +415,9 @@ class LibbyClient(object):
             return res
 
         decoded_res = res.decode("utf8")
-        if _scrub_sensitive_data and self.logger.level == logging.DEBUG:
-            try:
-                res_obj = json.loads(decoded_res)
-                if "identity" in res_obj:
-                    res_obj["identity"] = "*" * int(len(res_obj["identity"]) / 10)
-                self.logger.debug(
-                    "RES BODY: %s", json.dumps(res_obj, separators=(",", ":"))
-                )
-            except:  # noqa
-                # do nothing
-                pass
-        else:
-            self.logger.debug("RES BODY: %s", decoded_res)
+        if CustomLogger.logger.level == logging.DEBUG:
+            CustomLogger.log_response(decoded_res, "Libby RES BODY" )
+ 
         return decoded_res
 
     def _send_request(
@@ -487,59 +475,43 @@ class LibbyClient(object):
             if params == "":  # force post if empty string
                 data = "".encode("ascii")
             elif is_form:
-                data = urlencode(params).encode("ascii")
+                if isinstance(params, str) :
+                    raise TypeError(f"Attempting to pass parameters as string {params} to urlencode ")
+                else :
+                    data = urlencode(params).encode("ascii")
             else:
                 data = json.dumps(params, separators=(",", ":")).encode("ascii")
 
         req = Request(endpoint_url, data, headers=headers)
         if method:
-            req.get_method = (
-                lambda: method.upper()  # pylint: disable=unnecessary-lambda
+            req.get_method = (          # type: ignore[method-assign]
+                lambda: method.upper()  # pylint: disable=unnecessary-lambda 
             )
 
         for attempt in range(0, self.max_retries + 1):
             try:
-                self.logger.debug("REQUEST: %s %s", req.get_method(), endpoint_url)
-                bearer_token = req.headers.get("Authorization", "")
-                if _scrub_sensitive_data and bearer_token:
-                    bearer_token = bearer_token[: len("Bearer ")] + "*" * int(
-                        len(bearer_token[len("Bearer ") :]) / 10
-                    )
-                self.logger.debug(
-                    "REQ HEADERS: \n%s",
-                    "\n".join(
-                        [
-                            "{}: {}".format(
-                                k, v if k != "Authorization" else bearer_token
-                            )
-                            for k, v in req.headers.items()
-                        ]
-                    ),
-                )
-                if data:
-                    self.logger.debug("REQ BODY: \n%s", data)
+                CustomLogger.log_request(req, endpoint_url , data )
                 req_opener = self.opener if not no_redirect else self.opener_noredirect
                 response = req_opener.open(req, timeout=self.timeout)
             except HTTPError as e:
                 if e.code in (301, 302) and no_redirect:
                     response = e
                 else:
-                    self.logger.debug("RESPONSE: %d %s", e.code, e.url)
-                    self.logger.debug(
-                        "RES HEADERS: \n%s",
-                        "\n".join(["{}: {}".format(k, v) for k, v in e.info().items()]),
-                    )
+              
+                    CustomLogger.log_response_headers(e)
                     error_response = self._read_response(e)
                     if (
                         attempt < self.max_retries and e.code >= 500
                     ):  # retry for server 5XX errors
                         # do nothing, try
-                        self.logger.warning(
+                        CustomLogger.logger.warning(
                             "Retrying due to %s: %s", e.__class__.__name__, str(e)
                         )
-                        self.logger.debug(error_response)
+                        CustomLogger.logger.debug(error_response)
                         continue
-                    ErrorHandler.process(e, error_response)
+                    ErrorHandler.process(e, error_response)  # type: ignore[arg-type]
+                                                             # We can ignore the type error because error_response will be str since
+                                                             # self._read_response(e) returns a string unless we set decode to false
 
             except (
                 SSLError,
@@ -550,7 +522,7 @@ class LibbyClient(object):
                 ConnectionError,
             ) as connection_error:
                 if attempt < self.max_retries:
-                    self.logger.warning(
+                    CustomLogger.logger.warning(
                         "Retrying due to %s: %s",
                         connection_error.__class__.__name__,
                         str(connection_error),
@@ -562,12 +534,8 @@ class LibbyClient(object):
                         connection_error.__class__.__name__, str(connection_error)
                     )
                 ) from connection_error
-
-            self.logger.debug("RESPONSE: %d %s", response.code, response.url)
-            self.logger.debug(
-                "RES HEADERS: \n%s",
-                "\n".join(["{}: {}".format(k, v) for k, v in response.info().items()]),
-            )
+        
+            CustomLogger.log_response_headers(response)
             if return_response:
                 return response
 
@@ -598,9 +566,9 @@ class LibbyClient(object):
         try:
             return self._send_request(*args, **kwargs)
         except ClientForbiddenError as auth_error:
-            self.logger.warning("Encountered auth error %s, getting updated chip...", auth_error)
+            CustomLogger.logger.warning("Encountered auth error %s, getting updated chip...", auth_error)
             self.get_chip(update_internal_token=True, authenticated=True)
-            self.logger.warning("Re-sending request with updated chip...")
+            CustomLogger.logger.warning("Re-sending request with updated chip...")
             return self._send_request(*args, **kwargs)
 
 
@@ -1174,7 +1142,8 @@ class LibbyClient(object):
         :return:
         """
         tag_id = str(uuid.uuid4())
-        behaviors = {}
+        # behaviors = {}
+        behaviors: Dict[str, Dict[str, str]] = {}
         if tag_behaviour:
             behaviors[tag_behaviour] = {}
             if tag_type:

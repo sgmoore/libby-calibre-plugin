@@ -43,13 +43,19 @@ from qt.core import (
     # QRegularExpression,
 )
 
-from . import DEMO_MODE, PLUGIN_NAME, PLUGINS_FOLDER_NAME, logger
+from . import DEMO_MODE, PLUGIN_NAME, PLUGINS_FOLDER_NAME
 from .compat import _c
 from .utils import PluginColors
+from .tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tools.lint_helper import load_translations
+
+    from calibre.utils.localization import _, ngettext
+
+   
 
 load_translations()
 
@@ -246,7 +252,7 @@ class ConfigWidget(QWidget):
                     if (clip.find('Bearer') != -1 or clip.find('"libby_token"') != -1) :
                         self.libby_setup_code_txt.setText(clip)
                 except Exception as err :
-                    logger.warning("Could not monitor clipboard : %s", err)
+                    CustomLogger.logger.warning("Could not monitor clipboard : %s", err)
 
         libby_layout.addRow(self.libby_setup_code_lbl, self.libby_setup_code_txt)
 
@@ -719,7 +725,6 @@ class ConfigWidget(QWidget):
             identity_token=PREFS[PreferenceKeys.LIBBY_TOKEN],
             max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
             timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
-            logger=logger,
         )
         res = client.generate_clone_code()
         generated_code = res.get("code", "")
@@ -799,8 +804,8 @@ class ConfigWidget(QWidget):
             borrowed_date_custcol_name = (
                 self.borrow_date_col_text.text() or ""
             ).strip()
-            due_date_custcol_name = (self.due_date_col_text.text() or "").strip()
-            loan_type_custcol_name = (self.loan_type_col_text.text() or "").strip()
+            due_date_custcol_name       = (self.due_date_col_text.text()    or "").strip()
+            loan_type_custcol_name      = (self.loan_type_col_text.text()   or "").strip()
             return (
                 borrowed_date_custcol_name,
                 due_date_custcol_name,
@@ -872,7 +877,6 @@ class ConfigWidget(QWidget):
         from .libby import LibbyClient
 
         libby_client = LibbyClient(
-            logger=logger,
             timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
             max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
         )
@@ -905,7 +909,7 @@ class ConfigWidget(QWidget):
             libby_client.clone_by_code(setup_code)
 
         if libby_client.is_logged_in():
-            logger.warning("libby_client.is_logged_in() returns true")
+            CustomLogger.logger.warning("libby_client.is_logged_in() returns true")
             PREFS[PreferenceKeys.LIBBY_SETUP_CODE] = setup_code
             PREFS[PreferenceKeys.LIBBY_TOKEN] = chip_res["identity"]
             return True
@@ -1009,4 +1013,4 @@ class ConfigWidget(QWidget):
         try:
             self.plugin_action.apply_settings()
         except Exception as err:
-            logger.warning("Error applying settings: %s", err)
+            CustomLogger.logger.warning("Error applying settings: %s", err)

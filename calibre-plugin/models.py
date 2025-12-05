@@ -34,11 +34,18 @@ from .libby import LibbyClient
 from .libby.client import LibbyFormats, LibbyMediaTypes
 from .overdrive import OverDriveClient
 from .utils import PluginColors, PluginImages, obfuscate_date, obfuscate_name
-from re import sub, split, IGNORECASE
+from re import sub, IGNORECASE
+from .tools.CustomLogger import CustomLogger
+from .tools.decorators import enforce_types
+from .tools.guiMode import GuiMode
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tools.lint_helper import load_translations
+    from calibre.utils.localization import _
+
 
 load_translations()
 
@@ -83,13 +90,15 @@ class StaticCounter:
         return cls.counter
 
 
+@enforce_types
 def get_series(book:Dict , truncate:bool) -> str:
     try :
         return unsafe_get_series(book, truncate)
     except Exception as err:
-        print(f"Error getting series {err}")
+        CustomLogger.logger.warning(f"Error getting series {err}")
     return "" 
     
+@enforce_types
 def unsafe_get_series(book:Dict , truncate:bool) -> str:
     StaticCounter.increment()  
 
@@ -130,34 +139,50 @@ def unsafe_get_series(book:Dict , truncate:bool) -> str:
 
 NEVER_AVAILABLE = 999999
 
+
+@enforce_types
 def get_waitdays_integer(title:str , key:str , dict:Dict) -> int:
     availabilityType = dict.get("AvailabilityType" , "")
     isAvailable      = dict.get("isAvailable", False)
-    isOwned          = dict.get("isOwned", False)
+    isOwned          = dict.get("isOwned", None)
     available_copies = dict.get("AvailableCopies", 0)
     holds_count      = dict.get("holdsCount",0)
     owned_copies     = dict.get("ownedCopies", 0) 
     wait_days        = dict.get("estimatedWaitDays", 0) 
     lucky_day_copies = dict.get("luckyDayAvailableCopies", 0)
 
+    if not isinstance(title, str):
+       CustomLogger.logger.warning(f"Calling get_waitdays_integer Expected title to be a string but {title} is {type(title)} ")
+    if not isinstance(key, str):
+       CustomLogger.logger.warning(f"Calling get_waitdays_integer Expected key to be a string but {key} is {type(key)} ")
+    if not isinstance(title, str):
+       CustomLogger.logger.warning(f"Calling get_waitdays_integer Expected title to be a string but {title} is {type(title)} ")
+
+
     # Note. 
     # Available Copies is zero for always available books, but isAvailable looks to be accurate
     # Owned Copies is quite often zero even if isOwned is true , but in this case isOwned is probably wrong ,
     #    so we ignore isOwned and assume the book is not available
+
 
  
     if CALIBRE_DEBUG :
         dbg = ""
 
         # Test assumptions
+        
+        # Note, the basic search does not seem to return isOwned, so ignore this check is isOwned is none
 
-        if (not isOwned) and (owned_copies > 0 ) :
+        if isOwned is not None and (not isOwned) and (owned_copies > 0 ) :
             dbg = dbg  + " >>> Warning Check isOwned vs owned_copies "    
+            CustomLogger.log_and_format(dict , "Warning Check isOwned vs owned_copies")
 
         if (wait_days <= 0) and (not isAvailable) and (owned_copies > 0) :
             dbg = dbg  + " >>> Warning Check Not Available but wait days <= 0 "    
-                            
-        print(f"{dbg}{key} {title} : IsAvailable = {isAvailable} {availabilityType} available_copies = {available_copies} IsOwned= {isOwned} owned_copies = {owned_copies} {holds_count} held and wait time is around {wait_days} days  : lucky_day_copies = {lucky_day_copies} "  )
+            CustomLogger.log_and_format(dict , "Warning Check Not Available but wait days <= 0 ")
+
+        if GuiMode.IsAvailable :
+            CustomLogger.log_simple_string(f"{dbg}{key} {title:<30} : Available= {str(isAvailable):<5} {availabilityType} {available_copies:>3} available Owned= {str(isOwned):<5} {owned_copies:>2} owned {holds_count:>3} held & wait time ≈ {wait_days:3} days : lucky_day_copies = {lucky_day_copies:>2}"  )
 
 
     if (available_copies > 0 or isAvailable or availabilityType == "always" or lucky_day_copies > 0)  :

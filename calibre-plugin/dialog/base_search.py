@@ -20,10 +20,13 @@ from ..config import PREFS, PreferenceKeys, BorrowActions
 from ..libby import LibbyClient
 from ..models import get_media_title, truncate_for_display, get_waitdays_integer 
 from ..utils import PluginImages, obfuscate_name
+from ..tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _, ngettext
 
 load_translations()
 
@@ -163,6 +166,7 @@ class SearchBaseDialog(BaseDialogMixin):
                     )
             borrow_btn.setEnabled(True)
             borrow_btn.borrow_menu = borrow_menu
+            CustomLogger.logger.debug("view_selection_model_selectionchanged  : setting menu")
             borrow_btn.setMenu(borrow_menu)
         else:
             borrow_btn.borrow_menu = None
@@ -175,7 +179,7 @@ class SearchBaseDialog(BaseDialogMixin):
 
             title = media.get("title")
             print("")
-            print(f"Creating Hold site menu for {title}")
+            CustomLogger.logger.debug(f"Creating Hold site menu for {title}")
 
             for site in hold_sites:
                 libraryName = site["advantageKey"] 
@@ -185,7 +189,7 @@ class SearchBaseDialog(BaseDialogMixin):
                     wait_days_old = site.get("estimatedWaitDays", 0) 
                     wait_days = get_waitdays_integer(title , libraryName , site)
                     if (wait_days_old != wait_days) :
-                         print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  Wait days different {wait_days} <> {wait_days_old} for {title} {libraryName}")
+                        CustomLogger.logger.warning(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  Wait days different {wait_days} <> {wait_days_old} for {title} {libraryName}")
 
                     card_action = hold_menu.addAction(
                         QIcon(self.get_card_pixmap(site["__library"])),
@@ -227,7 +231,7 @@ class SearchBaseDialog(BaseDialogMixin):
                         lambda checked, m=media, c=card: self.create_hold(m, c)
                     )
             
-            print("Finished Creating Hold site menu")
+            CustomLogger.logger.debug("Finished Creating Hold site menu")
             print("")
             hold_btn.setEnabled(True)
             hold_btn.hold_menu = hold_menu

@@ -29,7 +29,6 @@ from qt.core import (
     Qt,
     QHeaderView,
     QMenu,
-    QMessageBox
  
 )
 
@@ -56,12 +55,14 @@ from ..utils import PluginImages
 from ..workers import OverDriveLibraryMediaSearchWorker
 
 from .. import PLUGIN_NAME, PLUGINS_FOLDER_NAME
+from ..tools.CustomLogger import CustomLogger, Redactor
 
-from ..utils import Scrub
+from typing import TYPE_CHECKING
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _ , ngettext
+
 
 load_translations()
 
@@ -512,7 +513,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
     def _process_search_results(self, library_key, results : Optional[Dict] ):
         with self.lock:
-            print(f"Type of results = {type(results)}")
+            CustomLogger.logger.debug(f"Type of results = {type(results)}")
             if results is None :
                 search_items = []
                 totalItems = 0
@@ -522,7 +523,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                 search_items = results.get("items", [])
 
                 noPerPage = PREFS[PreferenceKeys.SEARCH_RESULTS_MAX]
-                print(f'Items {len(search_items)} vs {noPerPage}')
+                CustomLogger.log_simple_string (f'{library_key} returned {len(search_items)} items (noPerPage = {noPerPage})')
                
 
                 try :
@@ -531,24 +532,24 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                     try :
                         totalItems = results["facets"]["availability"]["items"][1]["totalItems"]
                     except Exception as e2:
-                        print("")
-                        print(e2)
+                        CustomLogger.logger.debug("")
+                        CustomLogger.logger.exception(e2)
                         try :
-                            print(f'item[0] = {results["facets"]["availability"]["items"]}')
+                            CustomLogger.log_simple_string(f'item[0] = {results["facets"]["availability"]["items"]}')
                         except Exception as e3:
-                            print(e3)
+                            CustomLogger.logger.exception(e3)
                         totalItems = 0
                                  
                 try :
                     totalItems2 = results["totalItems"]
-                    print(f'item[3] = {totalItems2}')
+                    CustomLogger.logger.debug(f'item[3] = {totalItems2}')
                     lastPageNo = results["links"]["last"]["page"]
-                    print(f'lastPageNo = {lastPageNo}')
+                    CustomLogger.logger.debug(f'lastPageNo = {lastPageNo}')
 
                     if (lastPageNo > self.maximum_number_of_pages) :
                         self.maximum_number_of_pages = lastPageNo
                 except Exception as e3:
-                    print(e3)
+                    CustomLogger.logger.exception(e3)
                     
 
 
@@ -572,7 +573,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             combined_search_results: Dict[str, Dict] = {}
             
             for lib_key, result_items in self._lib_search_result_sets.items():
-                print (lib_key + " " + str(len(result_items)))
+                CustomLogger.log_simple_string(lib_key + " " + str(len(result_items)))
 
                 for item_rank, item in enumerate(result_items, start=1):
                     site_availability = {}
@@ -604,7 +605,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                     item.setdefault("__item_ranks", [])
                     item.setdefault("formats", [])
                     title_id = item["id"]
-                    print (str(item_rank) + " " + title_id)
+                    CustomLogger.logger.debug (str(item_rank) + " " + title_id)
                     combined_search_results.setdefault(title_id, item)
                     # merge site availabilities
                     combined_search_results[title_id]["siteAvailabilities"][
@@ -649,7 +650,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
                 self.adv_search_btn.setEnabled(True)
 
             self.adv_search_model.sync({"search_results": ordered_search_result_items}, False)
-            print(f"Synced : {self.adv_search_model.rowCount()} of {totalItems}")
+            CustomLogger.logger.debug(f"Synced : {self.adv_search_model.rowCount()} of {totalItems}")
 
             noOfResults = self.adv_search_model.rowCount()
 
@@ -685,7 +686,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
         def errored_out(lib_key: str, err: Exception):
             thread.quit()
-            self.logger.warning(
+            CustomLogger.logger.warning(
                 "Error encountered during search (%s): %s", lib_key, err
             )
             errorMessage = _("Error encountered during search ({library}): {error}").format(
@@ -711,7 +712,6 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
   
     
     def saveRows(self) :
-        import json
      
         fileName,_ = QFileDialog.getSaveFileName(
             None,
@@ -727,16 +727,13 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             data["Results"] = self.adv_search_model._rows
 
             
-            print(f"Calling scrub_sensitive_data on type = {type(data)}")
-            # jsonStr = json.dumps(data, indent=4)
-            jsonStr = Scrub.scrub_sensitive_data(data , "Search Results" , self.logger )
+            CustomLogger.logger.debug(f"Saving Search Results Calling redact_sensitive_data on type = {type(data)}")            
+            jsonStr = Redactor.redact_sensitive_data_as_json(data , "Search Results")
             
-            print(f"Type of jsonStr = {type(jsonStr)}")
-
             with open(fileName, "w") as text_file:
-                print(f"Saving {fileName}")
+                CustomLogger.logger.debug(f"Saving {fileName}")
                 text_file.write(jsonStr)
-                print("Saved")
+                CustomLogger.logger.debug("Saved")
     
     def loadRows(self) :
         import json
@@ -763,8 +760,8 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             with BusyCursor():
                 data = json.load(file) 
             
-            print(f"Type of data = {type(data)}")
             if (not isinstance(data, Dict)) or (data.get("Type") != f"{PLUGIN_NAME} Search Results" ) or not data.get("Results") :
+                CustomLogger.logger.debug(f'Loading search results data is type {type(data)} {data.get("Type")}')
                 error_dialog(None, _c("Invalid format"), _c("This file does not appear to be in the correct format ."), show=True, show_copy_button=False)
                 return
             

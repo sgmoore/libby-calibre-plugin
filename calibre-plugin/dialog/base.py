@@ -51,7 +51,7 @@ from qt.core import (
 )
 
 from .widgets import ClickableQLabel, CustomLoadingOverlay, DefaultQPushButton
-from .. import DEMO_MODE, logger
+from .. import DEMO_MODE 
 from ..compat import QToolButton_ToolButtonPopupMode_DelayedPopup, _c, ngettext_c
 from ..config import BorrowActions, PREFS, PreferenceKeys, SearchMode
 from ..empty_download import EmptyBookDownload
@@ -80,10 +80,14 @@ from ..utils import (
     svg_to_pixmap,
 )
 from ..workers import OverDriveMediaWorker, SyncDataWorker
+from ..tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _
+
 
 load_translations()
 
@@ -146,7 +150,6 @@ class BaseDialogMixin(QDialog):
         self.db = gui.current_db.new_api
         self.client = None
         self._sync_thread = QThread()  # main sync thread
-        self.logger = logger
         self.libraries_cache = libraries_cache
         self.media_cache = media_cache
         self.setWindowIcon(icon)
@@ -163,12 +166,10 @@ class BaseDialogMixin(QDialog):
                 identity_token=libby_token,
                 max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
                 timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
-                logger=logger,
             )
         self.overdrive_client = OverDriveClient(
             max_retries=PREFS[PreferenceKeys.NETWORK_RETRY],
             timeout=PREFS[PreferenceKeys.NETWORK_TIMEOUT],
-            logger=logger,
         )
 
         layout = QGridLayout()
@@ -210,10 +211,10 @@ class BaseDialogMixin(QDialog):
         new_height = dialog_size.height()
         if PREFS[PreferenceKeys.MAIN_UI_WIDTH] != new_width:
             PREFS[PreferenceKeys.MAIN_UI_WIDTH] = new_width
-            logger.debug("Saved new UI width preference: %d", new_width)
+            CustomLogger.logger.debug("Saved new UI width preference: %d", new_width)
         if PREFS[PreferenceKeys.MAIN_UI_HEIGHT] != new_height:
             PREFS[PreferenceKeys.MAIN_UI_HEIGHT] = new_height
-            logger.debug("Saved new UI height preference: %d", new_height)
+            CustomLogger.logger.debug("Saved new UI height preference: %d", new_height)
         self.libraries_cache.save()
         self.media_cache.save()
 
@@ -464,9 +465,13 @@ class BaseDialogMixin(QDialog):
                     else "",
                     8000,
                 )
+
+                # cards = value.get("cards", [])
+                # keys = list(set([c["advantageKey"] for c in cards]))
+                # Scrub.setLibraryKeys(keys)
             except RuntimeError as err:
                 # most likely because the UI has been closed before syncing was completed
-                logger.warning("Error processing sync results: %s", err)
+                CustomLogger.logger.warning("Error processing sync results: %s", err)
             finally:
                 thread.quit()
 
@@ -481,7 +486,7 @@ class BaseDialogMixin(QDialog):
                 return self.unhandled_exception(err, msg=_("Error synchronizing data"))
             except RuntimeError as err:
                 # most likely because the UI has been closed before syncing was completed
-                logger.warning("Error processing sync results: %s", err)
+                CustomLogger.logger.warning("Error processing sync results: %s", err)
 
         worker.finished.connect(lambda value: loaded(value))
         worker.errored.connect(lambda err: errored_out(err))
@@ -697,7 +702,7 @@ class BaseDialogMixin(QDialog):
                 self, _c("Unhandled exception"), msg, det_msg=fe, show=True
             )
         except Exception as err:
-            logger.exception(err)
+            CustomLogger.logger.exception(err)
 
     def create_hold(self, media, card):
         # create the hold
@@ -760,7 +765,7 @@ class BaseDialogMixin(QDialog):
                 restriction = "format:False"
                 # use restriction because it's apparently cached
                 # ref: https://manual.calibre-ebook.com/db_api.html#calibre.db.cache.Cache.search
-                self.logger.debug(
+                CustomLogger.logger.debug(
                     "Library Search Query (with restriction: %s): %s",
                     restriction,
                     search_query,
@@ -803,6 +808,11 @@ class BaseDialogMixin(QDialog):
     def download_empty_book(self, callBack, model : LibbyModel, book, format_id, tags=None):
         if not tags:
             tags = []
+
+        CustomLogger.log_simple_string(f'download_empty book called with parameters {type(callBack)} {type(model)} {type(book)} {type(format_id)} {type(tags)}')
+        CustomLogger.log_and_format(book, "book")
+        CustomLogger.log_and_format(format_id, "format_id")
+        CustomLogger.log_and_format(tags, "tags")
 
         # If the book comes from a search, it will not have a cardId, so we pick a card for the first library 
         if "cardId" in book :
@@ -849,19 +859,19 @@ class BaseDialogMixin(QDialog):
             rows = selection_model.selectedRows()
             for row in reversed(rows):
                 book = row.data(Qt.UserRole)
-            try:
-                format_id = LibbyClient.get_loan_format(
-                    book, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
-                )
-            except ValueError:
-                # kindle
-                format_id = LibbyClient.get_locked_in_format(book)
-                
-            if LibbyClient.is_downloadable_magazine_loan(book):
-                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
-            else :
-                tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
-            self.download_empty_book(callBack, libby_model , book, format_id, tags)
+                try:
+                    format_id = LibbyClient.get_loan_format(
+                        book, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
+                    )
+                except ValueError:
+                    # kindle
+                    format_id = LibbyClient.get_locked_in_format(book)
+                    
+                if LibbyClient.is_downloadable_magazine_loan(book):
+                    tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+                else :
+                    tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+                self.download_empty_book(callBack, libby_model , book, format_id, tags)
 
 
 class BookPreviewDialog(QDialog):
@@ -1091,7 +1101,7 @@ class BookPreviewDialog(QDialog):
                 self.layout.addWidget(det_scroll_area, self.widget_row_pos, 1, 2, 1)
             except RuntimeError as runtime_err:
                 # most likely because the UI has been closed before fetch was completed
-                logger.warning("Error displaying media results: %s", runtime_err)
+                CustomLogger.logger.warning("Error displaying media results: %s", runtime_err)
             finally:
                 thread.quit()
 

@@ -17,13 +17,15 @@ import sys
 from calibre.constants import DEBUG
 from calibre.customize import InterfaceActionBase
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from calibre.utils.localization import _
+    from .tools.lint_helper import load_translations
 
 load_translations()
-
-__version__ = (0, 2, 103)
+ 
+__version__ = (0, 2, 104)
 PLUGIN_NAME = "overdrive_libby"
 PLUGIN_ICON = "images/plugin.svg"
 PLUGINS_FOLDER_NAME = "plugins"

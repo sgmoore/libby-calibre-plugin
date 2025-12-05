@@ -15,19 +15,35 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import URLError
+from base import BaseTests , MockHTTPError
+from typing import TYPE_CHECKING
 
-from libby import LibbyClient, LibbyFormats
-from libby.errors import (
-    ClientBadRequestError,
-    ClientConnectionError,
-    ClientError,
-    ClientForbiddenError,
-    ClientNotFoundError,
-    ClientThrottledError,
-    ClientUnauthorisedError,
-    InternalServerError,
-)
-from .base import BaseTests, MockHTTPError
+if TYPE_CHECKING :
+    from libby import LibbyClient, LibbyFormats  
+
+    from libby.errors import (                   
+        ClientBadRequestError,
+        ClientConnectionError,
+        ClientError,
+        ClientForbiddenError,
+        ClientNotFoundError,
+        ClientThrottledError,
+        ClientUnauthorisedError,
+        InternalServerError,
+    )
+else :
+    from calibre_plugins.overdrive_libby.libby import LibbyClient, LibbyFormats   
+
+    from calibre_plugins.overdrive_libby.libby.errors import (                     
+        ClientBadRequestError,
+        ClientConnectionError,
+        ClientError,
+        ClientForbiddenError,
+        ClientNotFoundError,
+        ClientThrottledError,
+        ClientUnauthorisedError,
+        InternalServerError,
+    )
 
 
 class LibbyClientTests(BaseTests):
@@ -43,7 +59,6 @@ class LibbyClientTests(BaseTests):
             identity_token=token,
             max_retries=0,
             timeout=15,
-            logger=self.logger,
         )
 
     def test_get_chip(self):
@@ -296,7 +311,6 @@ class LibbyClientTests(BaseTests):
             identity_token=".",
             max_retries=0,
             timeout=15,
-            logger=self.logger,
         )
 
         open_mock.side_effect = [

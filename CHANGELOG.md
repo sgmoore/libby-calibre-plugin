@@ -1,5 +1,14 @@
 # Changelog
 
+Version 0.2.104 - 2025-12-05 Beta 
+- New Logging has been inproved and extended.
+    More personal/sensitive information has been removed or redacted from the log files including email address.
+    Json data has been reformatted to make it more readable
+
+Version 0.2.103 - 2025-07-19 Beta 
+ - Fix: Fixed issue with sorting search results by series if there were more than 99 books in the series.
+ - New: Added option to manually resize the columns widths in advanced search results table.
+ 
 Version 0.2.102 - 2025-06-19 Beta 
  - Fix: Fixed error clicking the "Clear" button in "Advanced Search" tab results if "Include titles without downloadable formats" is not enabled
 

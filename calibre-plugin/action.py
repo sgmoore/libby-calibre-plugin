@@ -44,13 +44,20 @@ from .utils import (
     SimpleCache,
     svg_to_qicon,
 )
+from .tools.guiMode import GuiMode
+
+from .tools.CustomLogger import CustomLogger
+from typing import TYPE_CHECKING
+
 
 PLUGIN_DIR = Path(config_dir, PLUGINS_FOLDER_NAME)
 CI_COMMIT_TXT = "commit.txt"
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = get_resources = lambda x=None: x
+
+if TYPE_CHECKING:
+    from calibre.utils.localization import _
+    from .tools.lint_helper import load_translations , get_resources
+
 
 load_translations()
 
@@ -73,6 +80,8 @@ class OverdriveLibbyAction(InterfaceAction):
 
     def genesis(self):
         # This method is called once per plugin, do initial setup here
+        GuiMode.IsAvailable = True
+        
 
         # extract icons
         try:
@@ -177,12 +186,10 @@ class OverdriveLibbyAction(InterfaceAction):
         self.libraries_cache = SimpleCache(
             persist_to_path=PLUGIN_DIR.joinpath(f"{PLUGIN_NAME}.libraries.json"),
             cache_age_days=PREFS[PreferenceKeys.CACHE_AGE_DAYS],
-            logger=logger,
         )
         self.media_cache = SimpleCache(
             persist_to_path=PLUGIN_DIR.joinpath(f"{PLUGIN_NAME}.media.json"),
             cache_age_days=PREFS[PreferenceKeys.CACHE_AGE_DAYS],
-            logger=logger,
         )
 
     def main_dialog_finished(self):
@@ -261,15 +268,15 @@ class OverdriveLibbyDialog(
             and PREFS[PreferenceKeys.MAIN_UI_WIDTH] > 0
         ):
             w = PREFS[PreferenceKeys.MAIN_UI_WIDTH]
-            logger.debug("Using saved window width: %d", w)
+            CustomLogger.logger.debug("Using saved window width : %d", w)
         if (
             PREFS[PreferenceKeys.MAIN_UI_HEIGHT]
             and PREFS[PreferenceKeys.MAIN_UI_HEIGHT] > 0
         ):
             h = PREFS[PreferenceKeys.MAIN_UI_HEIGHT]
-            logger.debug("Using saved windows height: %d", h)
+            CustomLogger.logger.debug("Using saved window height: %d", h)
 
-        logger.debug("Resizing window to: (%d, %d)", w, h)
+        CustomLogger.logger.debug("Resizing window to: (%d, %d)", w, h)
         self.resize(QSize(w, h))
 
         if PREFS[PreferenceKeys.DISABLE_TAB_MAGAZINES]:

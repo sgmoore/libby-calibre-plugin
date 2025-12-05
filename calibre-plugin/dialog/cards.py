@@ -50,9 +50,11 @@ from ..utils import (
 )
 from ..workers import LibbyAuthFormWorker, LibbyRenameCardWorker, LibbyVerifyCardWorker
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _
 
 
 load_translations()

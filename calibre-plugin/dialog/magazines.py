@@ -53,6 +53,13 @@ from ..overdrive import OverDriveClient
 from ..utils import PluginImages
 from ..workers import OverDriveLibraryMediaWorker
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _
+
+
 LIBBY_SHARE_URL_RE = re.compile(
     r"https://share\.libbyapp\.com/title/(?P<title_id>\d+)\b", re.IGNORECASE
 )
@@ -63,9 +70,6 @@ OVERDRIVE_URL_RE = re.compile(
     r"https://(.+)?overdrive.com/(.*/)?media/(?P<title_id>\d+)\b", re.IGNORECASE
 )
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
 
 
 load_translations()

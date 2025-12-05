@@ -16,5 +16,8 @@ from pathlib import Path
 
 sys.path.append(str(Path("calibre-plugin/").absolute()))
 
+print (str(Path("calibre-plugin/").absolute()))
+print (sys.path)
+
 from .libby import LibbyClientTests
 from .overdrive import OverDriveClientTests

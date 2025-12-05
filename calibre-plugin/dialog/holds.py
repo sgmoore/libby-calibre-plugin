@@ -52,10 +52,14 @@ from ..models import (
     is_valid_type,
 )
 from ..utils import PluginImages
+from ..tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _, ngettext
+
 
 load_translations()
 
@@ -206,7 +210,7 @@ class HoldsDialogMixin(BaseDialogMixin):
             return True 
         ldc = hold.get("luckyDayAvailableCopies", 0)
         title = hold.get("title")
-        print(f"{title} has {ldc} Lucky Day copies available")            
+        CustomLogger.logger.debug(f"{__class__.__name__} :: {title} has {ldc} Lucky Day copies available")            
         if hold.get("luckyDayAvailableCopies", 0) > 0:
             return True
         
@@ -601,7 +605,7 @@ class SuspendHoldDialog(QDialog):
             return True 
         ldc = hold.get("luckyDayAvailableCopies", 0)
         title = hold.get("title")
-        print(f"SuspendHoldDialog {title} has {ldc} Lucky Day copies available")            
+        CustomLogger.logger.debug(f"{__class__.__name__} :: {title} has {ldc} Lucky Day copies available")            
         if hold.get("luckyDayAvailableCopies", 0) > 0:
             return True
         

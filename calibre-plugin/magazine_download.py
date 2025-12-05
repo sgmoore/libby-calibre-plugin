@@ -32,7 +32,15 @@ from .libby import LibbyClient
 from .libby.client import LibbyFormats, LibbyMediaTypes
 from .magazine_download_utils import build_opf_package, guess_mimetype
 from .overdrive import OverDriveClient
-from .utils import create_job_logger, is_windows, slugify
+from .utils import is_windows, slugify
+from .tools.CustomLogger import CustomLogger
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tools.lint_helper import load_translations
+    from calibre.utils.localization import _
+
 
 NAV_XHTMLTEMPLATE = """
 <!DOCTYPE html>
@@ -52,9 +60,6 @@ NAV_XHTMLTEMPLATE = """
 </html>
 """
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
 
 load_translations()
 
@@ -380,7 +385,7 @@ class CustomMagazineDownload(LibbyDownload):
         abort=None,
         notifications=None,
     ):
-        logger = create_job_logger(log)
+
         if not tags:
             tags = []
 
@@ -392,7 +397,6 @@ class CustomMagazineDownload(LibbyDownload):
                 loan,
                 format_id,
                 filename,
-                logger,
                 abort,
                 notifications,
             )
@@ -406,11 +410,10 @@ class CustomMagazineDownload(LibbyDownload):
                 0,
                 tags,
                 None,
-                logger=logger,
             )
         except UnsupportedException as unsupported_err:
-            logger.warning(_("Unable to download magazine: %s"), str(unsupported_err))
-            logger.warning(_("Downloading as an empty book instead."))
+            CustomLogger.logger.warning(_("Unable to download magazine: %s"), str(unsupported_err))
+            CustomLogger.logger.warning(_("Downloading as an empty book instead."))
 
             # download as empty book
             download_empty_book = EmptyBookDownload()
@@ -448,7 +451,6 @@ class CustomMagazineDownload(LibbyDownload):
         loan: Dict,
         format_id: str,
         filename: str,
-        logger=None,
         abort=None,
         notifications=None,
     ) -> Path:
@@ -514,7 +516,7 @@ class CustomMagazineDownload(LibbyDownload):
             and OverDriveClient.extract_type(loan) == LibbyMediaTypes.Magazine
         ):
             msg = _("Magazine has unsupported fixed-layout (pre-paginated) format.")
-            logger.error(msg)
+            CustomLogger.logger.error(msg)
             raise UnsupportedException(msg, media_info)
 
         # for finding cover image for magazines
@@ -582,17 +584,17 @@ class CustomMagazineDownload(LibbyDownload):
         for i, entry in enumerate(title_content_entries, start=1):
             if abort.is_set():
                 msg = "Abort signal received."
-                logger.info(msg)
+                CustomLogger.logger.info(msg)
                 raise RuntimeError(msg)
             entry_url = entry["url"]
             parsed_entry_url = urlparse(entry_url)
             title_content_path = Path(parsed_entry_url.path[1:])
-            logger.info(
+            CustomLogger.logger.info(
                 "Proccesing %d/%d : %s", i, total_downloads, title_content_path.name
             )
             media_type = guess_mimetype(title_content_path.name)
             if not media_type:
-                logger.warning("Skipped roster entry: %s", title_content_path.name)
+                CustomLogger.logger.warning("Skipped roster entry: %s", title_content_path.name)
                 continue
             asset_folder = book_content_folder.joinpath(title_content_path.parent)
             if media_type == "application/x-dtbncx+xml":
@@ -668,7 +670,7 @@ class CustomMagazineDownload(LibbyDownload):
                             if not asset_font_path.exists():
                                 css_content = css_content.replace(src_match, "")
                     except Exception as patch_err:
-                        logger.warning(
+                        CustomLogger.logger.warning(
                             "Error while patching font sources: %s", patch_err
                         )
                 with open(asset_file_path, "w", encoding="utf-8") as f_out:
@@ -679,7 +681,7 @@ class CustomMagazineDownload(LibbyDownload):
                 if script_ele and hasattr(script_ele, "string"):
                     mobj = contents_re.search(script_ele.string or "")
                     if not mobj:
-                        logger.warning(
+                        CustomLogger.logger.warning(
                             "Unable to extract content string for %s",
                             parsed_entry_url.path,
                         )
@@ -860,7 +862,7 @@ class CustomMagazineDownload(LibbyDownload):
                         and meta_id.get("content")
                         and meta_id["content"] != expected_book_identifier
                     ):
-                        logger.debug(
+                        CustomLogger.logger.debug(
                             'Replacing identifier in %s: "%s" -> "%s"',
                             ncx_path.name,
                             meta_id["content"],
@@ -993,7 +995,7 @@ class CustomMagazineDownload(LibbyDownload):
         )
         tree = ET.ElementTree(container)
         tree.write(container_file_path, xml_declaration=True, encoding="utf-8")
-        logger.debug('Saved "%s"', container_file_path)
+        CustomLogger.logger.debug('Saved "%s"', container_file_path)
 
         # create epub zip
         with zipfile.ZipFile(
@@ -1012,8 +1014,8 @@ class CustomMagazineDownload(LibbyDownload):
                     zip_archive_name = zip_archive_file.as_posix()
                     zip_target_file = book_folder.joinpath(zip_archive_file)
                     epub_zip.write(zip_target_file, zip_archive_name)
-                    logger.debug(
+                    CustomLogger.logger.debug(
                         'epub: Added "%s" as "%s"', zip_target_file, zip_archive_name
                     )
-        logger.info('Saved "%s"', epub_file_path)
+        CustomLogger.logger.info('Saved "%s"', epub_file_path)
         return epub_file_path

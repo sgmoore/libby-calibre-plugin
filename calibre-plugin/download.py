@@ -21,7 +21,7 @@ from .config import PREFS, PreferenceKeys
 from .libby import LibbyClient
 from .overdrive import OverDriveClient
 from .utils import OD_IDENTIFIER, generate_od_identifier
-
+from .tools.CustomLogger import CustomLogger
 
 class LibbyDownload:
     """
@@ -132,14 +132,13 @@ class LibbyDownload:
 
         return metadata
 
-    def update_custom_columns(self, book_id, loan, db, logger):
+    def update_custom_columns(self, book_id, loan, db):
         """
         Update custom columns from loan.
 
         :param book_id:
         :param loan:
         :param db:
-        :param logger:
         :return:
         """
         try:
@@ -150,7 +149,7 @@ class LibbyDownload:
                     {book_id: borrowed_date},
                 )
         except Exception as err:
-            logger.exception("Error updating Borrowed Date: %s", err)
+            CustomLogger.logger.exception("Error updating Borrowed Date: %s", err)
         try:
             if PREFS[PreferenceKeys.CUSTCOL_DUE_DATE] and loan.get("expireDate"):
                 due_date = LibbyClient.parse_datetime(loan["expireDate"])
@@ -159,7 +158,7 @@ class LibbyDownload:
                     {book_id: due_date},
                 )
         except Exception as err:
-            logger.exception("Error updating Due Date: %s", err)
+            CustomLogger.logger.exception("Error updating Due Date: %s", err)
 
         try:
             if PREFS[PreferenceKeys.CUSTCOL_LOAN_TYPE] and loan.get("type", {}).get(
@@ -170,7 +169,7 @@ class LibbyDownload:
                     {book_id: OverDriveClient.extract_type(loan)},
                 )
         except Exception as err:
-            logger.exception("Error updating Loan Type: %s", err)
+            CustomLogger.logger.exception("Error updating Loan Type: %s", err)
 
     def add(
         self,
@@ -183,7 +182,6 @@ class LibbyDownload:
         book_id: int = 0,
         tags: Optional[List[str]] = None,
         metadata=None,
-        logger=None,
     ) -> None:
         """
         Adds the new downloaded book to calibre db
@@ -197,7 +195,6 @@ class LibbyDownload:
         :param book_id:
         :param tags:
         :param metadata:
-        :param logger:
         :return:
         """
 
@@ -205,7 +202,7 @@ class LibbyDownload:
         ext = downloaded_file.suffix[1:]  # remove the "." suffix
 
         if book_id and metadata:
-            logger.info(
+            CustomLogger.logger.info(
                 "Adding %s format to existing book %s", ext.upper(), metadata.title
             )
             # we have to run_import_plugins first so that we can get
@@ -231,7 +228,7 @@ class LibbyDownload:
                 # we update new_metadata using old metadata to keep old metadata as precedence
                 new_metadata.smart_update(metadata)
                 db.set_metadata(book_id, new_metadata)
-                self.update_custom_columns(book_id, loan, db, logger)
+                self.update_custom_columns(book_id, loan, db)
 
                 if PREFS[PreferenceKeys.MARK_UPDATED_BOOKS]:
                     gui.current_db.set_marked_ids([book_id])  # mark updated book
@@ -259,6 +256,6 @@ class LibbyDownload:
             gui.library_view.model().db.add_format_with_hooks(
                 book_id, new_ext.upper(), new_path, index_is_id=True
             )
-            self.update_custom_columns(book_id, loan, db, logger)
+            self.update_custom_columns(book_id, loan, db)
             gui.library_view.model().books_added(1)
             gui.library_view.model().count_changed()

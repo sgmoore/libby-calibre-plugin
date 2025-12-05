@@ -1,1 +1,1 @@
-calibre-debug -e .\tests\calibre.py
+calibre-customize -b calibre-plugin && calibre-debug -e tests/all.py

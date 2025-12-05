@@ -14,11 +14,14 @@ from typing import Dict
 
 from .libby import LibbyClient
 from .models import get_media_title
-from .utils import create_job_logger
+from .tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x  # noqa: E731
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    load_translations = lambda x=None: x  # noqa: E731
+    from calibre.utils.localization import _
+
 
 load_translations()
 
@@ -33,10 +36,10 @@ class LibbyLoanReturn:
         abort=None,
         notifications=None,
     ):
-        logger = create_job_logger(log)
         notifications.put((0.5, _("Returning")))
         libby_client.return_loan(loan)
-        logger.info("Returned %s successfully.", get_media_title(loan))
+        CustomLogger.logger.info("Returned %s successfully.", get_media_title(loan))
+
         return loan
 
 
@@ -50,8 +53,7 @@ class LibbyLoanRenew:
         abort=None,
         notifications=None,
     ):
-        logger = create_job_logger(log)
         notifications.put((0.5, _("Renewing")))
         new_loan = libby_client.renew_loan(loan)
-        logger.info("Renewed %s successfully.", get_media_title(loan))
+        CustomLogger.logger.info("Renewed %s successfully.", get_media_title(loan))
         return new_loan

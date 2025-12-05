@@ -24,8 +24,7 @@ from qt.core import (
     pyqtSignal,
 )
 
-from .. import logger
-
+from ..tools.CustomLogger import CustomLogger
 
 class CustomLoadingOverlay(LoadingOverlay):
     # Custom https://github.com/kovidgoyal/calibre/blob/a562c1f637cf2756fa8336860543a15951f4fbc0/src/calibre/gui2/viewer/overlay.py#L10
@@ -35,7 +34,7 @@ class CustomLoadingOverlay(LoadingOverlay):
             return QWidget.hide(self)
         except RuntimeError as err:
             # most likely because the UI has been closed before loading was completed
-            logger.warning("Error hiding loading overlay: %s", err)
+            CustomLogger.logger.warning("Error hiding loading overlay: %s", err)
 
 
 class ClickableQLabel(QLabel):

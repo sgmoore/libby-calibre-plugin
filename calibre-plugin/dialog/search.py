@@ -42,9 +42,12 @@ from ..models import (
 from ..utils import PluginImages
 from ..workers import OverDriveMediaSearchWorker
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _, ngettext
+
 
 load_translations()
 

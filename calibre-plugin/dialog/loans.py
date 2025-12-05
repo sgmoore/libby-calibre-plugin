@@ -51,10 +51,14 @@ from ..models import (
 # from ..overdrive import OverDriveClient
 from ..utils import PluginImages
 from ..workers import LibbyFulfillLoanWorker
+from ..tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = ngettext = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..tools.lint_helper import load_translations
+    from calibre.utils.localization import _, ngettext
+
 
 load_translations()
 
@@ -304,14 +308,16 @@ class LoansDialogMixin(BaseDialogMixin):
                     )
                 )
 
-        # view book details
-        self.add_view_book_details_menu_action(menu, selected_loan)
-        # copy share link
-        self.add_copy_share_link_menu_action(menu, selected_loan)
-        # find calibre matches
-        self.add_find_library_match_menu_action(menu, selected_loan)
-        # search for title
-        self.add_search_for_title_menu_action(menu, selected_loan)
+        if len(indices) == 1 : # These actions only work on one item, so disable them if more than one item is selected 
+            
+            # view book details
+            self.add_view_book_details_menu_action(menu, selected_loan)
+            # copy share link
+            self.add_copy_share_link_menu_action(menu, selected_loan)
+            # find calibre matches
+            self.add_find_library_match_menu_action(menu, selected_loan)
+            # search for title
+            self.add_search_for_title_menu_action(menu, selected_loan)
 
         return_action = menu.addAction(
             ngettext("Return {n} loan", "Return {n} loans", len(indices)).format(
@@ -374,12 +380,13 @@ class LoansDialogMixin(BaseDialogMixin):
 
     def openLibbyDownload(self, loan) :
         libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
-        self.logger.debug("Opening %s" , libbyurl)
+        CustomLogger.log_simple_string(f"Opening {libbyurl}")
         open_url(libbyurl)         
        
     def download_loan(self, loan: Dict):
         # do actual downloading of the loan
 
+        CustomLogger.log_and_format(loan, "Attempted download")
         try:
             format_id = LibbyClient.get_loan_format(
                 loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
@@ -391,6 +398,8 @@ class LoansDialogMixin(BaseDialogMixin):
             if format_id:
                 # create empty book
                 return self.download_empty_loan(self, format_id, tags)
+            
+        CustomLogger.log_simple_string(f"Format_id {format_id}")
 
         if LibbyClient.is_downloadable_audiobook_loan(loan):
             return self.download_empty_loan(self, loan, format_id)
@@ -432,7 +441,7 @@ class LoansDialogMixin(BaseDialogMixin):
 
         book_id, mi = self.match_existing_book(loan, library, format_id)
         if mi and book_id:
-            self.logger.debug("Matched existing empty book: %s", mi.title)
+            CustomLogger.logger.debug("Matched existing empty book: %s", mi.title)
 
         description = (
             _(
@@ -485,7 +494,7 @@ class LoansDialogMixin(BaseDialogMixin):
 
         book_id, mi = self.match_existing_book(loan, library, format_id)
         if mi and book_id:
-            self.logger.debug("Matched existing empty book: %s", mi.title)
+            CustomLogger.logger.debug("Matched existing empty book: %s", mi.title)
 
         description = _c("Downloading %s") % as_unicode(
             get_media_title(loan), errors="replace"
@@ -577,7 +586,7 @@ class LoansDialogMixin(BaseDialogMixin):
                 self.loans_search_proxy_model.unhide(job.result)
         except RuntimeError as runtime_err:
             # most likely because the plugin UI was closed before download was completed
-            self.logger.warning("Error displaying media results: %s", runtime_err)
+            CustomLogger.logger.warning("Error displaying media results: %s", runtime_err)
         self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
 
     def read_with_kindle_action_triggered(self, loan: Dict, format_id: str):

@@ -2,13 +2,17 @@
 # Keep compat functions here
 #
 import re
-from typing import Tuple
+import sys
+from typing import Tuple, Union, Dict, List, Any
+from http.client import HTTPMessage
 
 from qt.core import QColor, QHeaderView, QPainter, QSlider, QToolButton, Qt
 
-# noinspection PyUnreachableCode
-if False:
-    ngettext = _ = lambda x=None, y=None, z=None: x
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from calibre.utils.localization import _ , ngettext
+
+    
 
 try:
     from calibre.utils.localization import _ as _c
@@ -88,3 +92,19 @@ def hex_to_rgb(hexcolor: str) -> Tuple:
     if len(hexcolor) == 3:
         return tuple(int(hexcolor[i : i + 1] * 2, 16) for i in (0, 1, 2))
     return tuple(int(hexcolor[i : i + 2], 16) for i in (0, 2, 4))
+
+
+# type definitions
+
+if sys.version_info >= (3, 10):
+    DictList = Dict | List
+    RedactableTypes = str | bytes | Dict | List | HTTPMessage
+    RedactableHeaders = Dict | HTTPMessage
+    StrOrAny = Any | str 
+else:
+    DictList = Union[Dict, List]
+    RedactableTypes = Union[str , bytes, Dict , List , HTTPMessage]
+    RedactableHeaders = Union[Dict, HTTPMessage]
+    StrOrAny =  Union[Any , str ]
+
+

@@ -1,0 +1,27 @@
+# This is not proper encryption, but simply obscurs certain details so that they are not stored in 
+# plain text.
+# It should not be used with important details such as bearer/authenication token which should be
+# never be recorded in log files.
+
+import base64
+
+def _encode(key, clear):
+    enc = []
+    for i in range(len(clear)):
+        key_c = key[i % len(key)]
+        enc_c = chr((ord(clear[i]) + ord(key_c)) % 256)
+        enc.append(enc_c)
+    return base64.urlsafe_b64encode("".join(enc).encode()).decode()
+
+def _decode(key, enc):
+    dec = []
+    enc = base64.urlsafe_b64decode(enc).decode()
+    for i in range(len(enc)):
+        key_c = key[i % len(key)]
+        dec_c = chr((256 + ord(enc[i]) - ord(key_c)) % 256)
+        dec.append(dec_c)
+    return "".join(dec)
+
+
+def encode(value : str) :
+    return _encode(value, value)

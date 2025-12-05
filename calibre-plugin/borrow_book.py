@@ -14,11 +14,15 @@ from typing import Dict
 
 from .libby import LibbyClient
 from .models import get_media_title
-from .utils import create_job_logger
+from .tools.CustomLogger import CustomLogger
 
-# noinspection PyUnreachableCode
-if False:
-    load_translations = _ = lambda x=None: x
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tools.lint_helper import load_translations
+
+    from calibre.utils.localization import _
+
 
 load_translations()
 
@@ -35,16 +39,15 @@ class LibbyBorrowMedia:
         abort=None,
         notifications=None,
     ):
-        logger = create_job_logger(log)
         notifications.put((0.5, _("Borrowing")))
         loan = libby_client.borrow_media(media, card, is_lucky_day_loan)
-        logger.info(
+        CustomLogger.logger.info(
             "Borrowed %s successfully from %s.",
             get_media_title(loan),
             card["advantageKey"],
         )
         if "cardId" not in loan:
-            logger.warning("Loan info returned does not have cardId")
+            CustomLogger.logger.warning("Loan info returned does not have cardId")
             if media.get("cardId"):  # from a hold
                 loan["cardId"] = media["cardId"]
         return loan
