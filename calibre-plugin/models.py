@@ -193,12 +193,13 @@ def get_waitdays_integer(title:str , key:str , dict:Dict) -> int:
 
     return NEVER_AVAILABLE
 
-def get_waitdays_description(media:Dict) -> str:
+@enforce_types
+def get_waitdays_description(media:Dict, for_sorting=False) -> str:
     try :
         sites = media.get("siteAvailabilities", {}) 
 
         if not sites :
-           return "n/a"
+           return str(NEVER_AVAILABLE) if for_sorting else "n/a"
 
         title = media["title"]
 
@@ -215,12 +216,12 @@ def get_waitdays_description(media:Dict) -> str:
                 smallestWaitDays = wait_days
                     
         if (smallestWaitDays == NEVER_AVAILABLE) :
-            return "n/a" 
+            return str(NEVER_AVAILABLE) if for_sorting else "n/a"
        
-        return str(smallestWaitDays)
+        return  f"{smallestWaitDays:06d}" if for_sorting else str(smallestWaitDays)
 
     except Exception as err:
-        print(f"Error calculating waitdays {err}")
+        CustomLogger.logger.exception(f"Error calculating waitdays {err}")
     return "" 
 
 
@@ -1284,13 +1285,7 @@ class LibbySearchModel(LibbyModel):
         if col == 6:
             return get_series(media, truncate = role != LibbyModel.DisplaySortRole )
         if col == 7:
-            waitdaysDesc = get_waitdays_description(media) 
-            if role == LibbyModel.DisplaySortRole:
-                # Ensure that n/a books are sorted to display last.
-                if (waitdaysDesc == 'n/a') : 
-                    return NEVER_AVAILABLE
-
-            return waitdaysDesc
+            return get_waitdays_description(media , for_sorting= role == LibbyModel.DisplaySortRole) 
 
         return None
 
