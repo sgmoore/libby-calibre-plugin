@@ -445,12 +445,10 @@ class ConfigWidget(QWidget):
             self.borrow_date_col_text.setClearButtonEnabled(True)
             self.borrow_date_col_text.setText(
                 PREFS[PreferenceKeys.CUSTCOL_BORROWED_DATE]
-                if self.db.field_metadata.has_key(
-                    self.custom_column_name("borrowed date")
-                )
-                and not DEMO_MODE
+                if not DEMO_MODE
                 else ""
             )
+
             borrow_date_col_lbl.setBuddy(self.borrow_date_col_text)
             borrow_date_col_layout.addWidget(borrow_date_col_lbl)
             borrow_date_col_layout.addWidget(self.borrow_date_col_text)
@@ -463,8 +461,7 @@ class ConfigWidget(QWidget):
             self.due_date_col_text.setClearButtonEnabled(True)
             self.due_date_col_text.setText(
                 PREFS[PreferenceKeys.CUSTCOL_DUE_DATE]
-                if self.db.field_metadata.has_key(self.custom_column_name("due date"))
-                and not DEMO_MODE
+                if not DEMO_MODE
                 else ""
             )
             due_date_col_lbl.setBuddy(self.due_date_col_text)
@@ -481,8 +478,7 @@ class ConfigWidget(QWidget):
             self.loan_type_col_text.setClearButtonEnabled(True)
             self.loan_type_col_text.setText(
                 PREFS[PreferenceKeys.CUSTCOL_LOAN_TYPE]
-                if self.db.field_metadata.has_key(self.custom_column_name("loan type"))
-                and not DEMO_MODE
+                if not DEMO_MODE
                 else ""
             )
             loan_type_col_lbl.setBuddy(self.loan_type_col_text)
@@ -555,6 +551,9 @@ class ConfigWidget(QWidget):
             ):
                 layout.setStretch(1, 1)
                 loan_layout.addRow(layout)
+
+
+              
 
         # ------------------------------------ HOLDS / SEARCH TAB ------------------------------------
         # ------------------------------------ Holds ------------------------------------
@@ -801,9 +800,7 @@ class ConfigWidget(QWidget):
             and hasattr(self, "due_date_col_text")
             and hasattr(self, "loan_type_col_text")
         ):
-            borrowed_date_custcol_name = (
-                self.borrow_date_col_text.text() or ""
-            ).strip()
+            borrowed_date_custcol_name  = (self.borrow_date_col_text.text() or "").strip()
             due_date_custcol_name       = (self.due_date_col_text.text()    or "").strip()
             loan_type_custcol_name      = (self.loan_type_col_text.text()   or "").strip()
             return (
