@@ -383,14 +383,34 @@ class HoldsDialogMixin(BaseDialogMixin):
 
     def borrow_hold(self, hold, availability=None, do_download=False):
 
-        if not availability:
-            # this is supplied from the search tab
-            availability = {}
+        # Attempted fix for code to determine if a hold is a 'lucky day' loan. It is almost impossible to
+        # test this as it would require you to place a hold on a book that is not marked as a lucky day loan
+        # but then have the book changed to be a lucky day loan during the period you have it on hold. Since
+        # the number of lucky day loans is extremely low, that is virtually impossible to predict and test.
+        # Hence if this throws an exception then we fall back to the old code
 
-        is_lucky_day_loan = bool(
-            availability.get("luckyDayAvailableCopies", 0)
-            and not availability.get("availableCopies", 0)
-        )
+        try :
+            CustomLogger.log_and_format (hold, "Borrowing book")
+            if availability is not None :
+                CustomLogger.log_and_format(availability, "Borrowing non-hold availability" )
+        except Exception as err :
+             CustomLogger.logger.error(f"Error when logging info on book being borrowed{err}")
+             return 
+
+      
+        try :
+            availability_source = availability if availability is not None else hold
+            is_lucky_day_loan = bool(availability_source.get("luckyDayAvailableCopies", 0) and not availability_source.get("availableCopies", 0))
+        except Exception as err :
+            CustomLogger.logger.error(f"Error determining is_lucky_day_loan when borrowing book {err} ")
+
+            if not availability:            
+                # this is supplied from the search tab, but not the holds tab
+                availability = {}
+            is_lucky_day_loan = bool(
+                availability.get("luckyDayAvailableCopies", 0)
+                and not availability.get("availableCopies", 0)
+            )
 
         # do the actual borrowing
         card = self.holds_model.get_card(hold["cardId"])
