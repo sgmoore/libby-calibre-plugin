@@ -1,5 +1,11 @@
 # Changelog
 
+Version 0.3.0 - 2026-02-09 
+ - Fix : Fixed another issue sorting by wait days
+ - Fix : Fix for issue with custom column names (see https://github.com/sgmoore/libby-calibre-plugin/issues/12)
+ - Fix : Possible fix for issue with lucky day loan
+ - Fix : No longer displays option to 'Borrow and download' loan (as that feature does not work)
+
 Version 0.2.104 - 2025-12-05 Beta 
 - New Logging has been inproved and extended.
     More personal/sensitive information has been removed or redacted from the log files including email address.
