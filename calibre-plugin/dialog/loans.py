@@ -383,7 +383,7 @@ class LoansDialogMixin(BaseDialogMixin):
         CustomLogger.log_simple_string(f"Opening {libbyurl}")
         open_url(libbyurl)         
        
-    def download_loan(self, loan: Dict):
+    def old_download_loan(self, loan: Dict):
         # do actual downloading of the loan
 
         CustomLogger.log_and_format(loan, "Attempted download")
