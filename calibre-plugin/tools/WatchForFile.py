@@ -13,11 +13,12 @@ class FileWaiter(QObject):
     timeout_reached = pyqtSignal()
   
 
-    def __init__(self, folder, extension, interval_ms, timeout_ms):
+    def __init__(self, folder, extension, interval_ms, timeout_ms, cancel_callback=None):
         super().__init__()
         self.folder = folder
         self.extension = extension
         self.start_time = time.time()
+        self.cancel_callback = cancel_callback
 
         self.watcher = QFileSystemWatcher([folder])
         self.watcher.directoryChanged.connect(self.check_for_file)
@@ -34,6 +35,10 @@ class FileWaiter(QObject):
         self.timeout_timer.start()
 
     def check_for_file(self):
+        if self.cancel_callback and self.cancel_callback():
+            self.handle_timeout()
+            return
+            
         self.extension = self.extension.lower()
         print(f"checking for {self.extension} in {self.folder}")
         for fname in os.listdir(self.folder):          
@@ -51,11 +56,6 @@ class FileWaiter(QObject):
                         startString   = datetime.datetime.fromtimestamp(self.start_time).strftime("%Y-%m-%d %H:%M:%S")
                         CustomLogger.log_simple_string(f"Ignoring pre-existing file {full_path} {createdString} before {startString}")
 
-
-
-
-
-
     def handle_timeout(self):
         self.timeout_reached.emit()
         self.cleanup()
@@ -65,9 +65,9 @@ class FileWaiter(QObject):
         self.timeout_timer.stop()
         self.watcher.removePath(self.folder)
                                 
-def wait_for_file_qt(folder : str, extension : str,  interval_ms = 500, timeout_ms=300000) -> Optional[Path]:    # 300000 = 5 minutes
+def wait_for_file_qt(folder : str, extension : str,  interval_ms = 500, timeout_ms=300000, cancel_callback=None) -> Optional[Path]:    # 300000 = 5 minutes
     loop = QEventLoop()
-    waiter = FileWaiter(folder, extension, interval_ms , timeout_ms)
+    waiter = FileWaiter(folder, extension, interval_ms , timeout_ms, cancel_callback)
 
     result = {}
 

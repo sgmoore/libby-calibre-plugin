@@ -174,9 +174,9 @@ class LoansDialogMixin(BaseDialogMixin):
 
         # Download button
         self.download_btn = DefaultQPushButton(
-            _c("Open in libbyapp.com"), self.resources[PluginImages.Download], self
+            _c("Download"), self.resources[PluginImages.Download], self
         )
-        self.download_btn.setToolTip(_("Open loan in libbyapp.com website"))
+        self.download_btn.setToolTip(_("Download loan to calibre (opens browser for fulfillment)"))
         self.download_btn.clicked.connect(self.download_btn_clicked)
         widget.layout.addWidget(
             self.download_btn,
@@ -371,12 +371,123 @@ class LoansDialogMixin(BaseDialogMixin):
         if selection_model.hasSelection():
             rows = selection_model.selectedRows()
             for row in reversed(rows):
-                self.openLibbyDownload(row.data(Qt.UserRole))
-                # self.download_loan(row.data(Qt.UserRole))
-                # if PREFS[PreferenceKeys.HIDE_BOOKS_ALREADY_IN_LIB]:
-                #     self.loans_search_proxy_model.temporarily_hide(
-                #         row.data(Qt.UserRole)
-                #     )
+                if PREFS.get(PreferenceKeys.USE_BROWSER_DOWNLOAD, True):
+                    self.browser_assisted_download(row.data(Qt.UserRole))
+                else:
+                    self.openLibbyDownload(row.data(Qt.UserRole))
+
+    def browser_assisted_download(self, loan):
+        downloads_folder = PREFS.get(PreferenceKeys.DOWNLOADS_FOLDER, "")
+        if not downloads_folder:
+            from calibre.gui2 import error_dialog
+            error_dialog(
+                self,
+                _("Downloads Folder Not Set"),
+                _("Please configure your Downloads folder in the plugin settings (General tab) to use browser-assisted downloading."),
+                show=True,
+            )
+            self.openLibbyDownload(loan)
+            return
+
+        from ..tools.WatchForFile import wait_for_file_qt
+        
+        try:
+            format_id = LibbyClient.get_loan_format(
+                loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
+            )
+        except ValueError:
+            format_id = LibbyClient.get_locked_in_format(loan)
+            
+        expected_ext = LibbyClient.get_file_extension(format_id) if format_id else "acsm"
+        if not expected_ext.startswith("."):
+            expected_ext = f".{expected_ext}"
+            
+        libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
+        CustomLogger.log_simple_string(f"Opening {libbyurl} and watching {downloads_folder} for {expected_ext}")
+        open_url(libbyurl)
+
+        from qt.core import QProgressDialog, Qt
+        
+        progress = QProgressDialog(_("Waiting for download to finish in browser..."), _("Cancel"), 0, 0, self)
+        progress.setWindowTitle(_("Browser-Assisted Download"))
+        progress.setWindowModality(Qt.WindowModal)
+        progress.show()
+        
+        # Start watching
+        file_path = wait_for_file_qt(downloads_folder, expected_ext, cancel_callback=progress.wasCanceled)
+        progress.close()
+        
+        if file_path:
+            CustomLogger.log_simple_string(f"File found at {file_path}, importing...")
+            self.import_downloaded_file(loan, format_id, file_path)
+        else:
+            CustomLogger.log_simple_string("Download timed out or was canceled.")
+
+    def import_downloaded_file(self, loan, format_id, file_path):
+        from ..ebook_download import CustomEbookDownload
+        from ..magazine_download import CustomMagazineDownload
+        
+        # Figure out the tags
+        if LibbyClient.is_downloadable_magazine_loan(loan):
+            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+            downloader = CustomMagazineDownload()
+        else:
+            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+            downloader = CustomEbookDownload()
+            
+        card = self.loans_model.get_card(loan["cardId"])
+        library = self.loans_model.get_library(self.loans_model.get_website_id(card))
+
+        book_id, metadata = self.match_existing_book(loan, library, format_id)
+            
+        description = _("Importing {format} for {book}").format(
+            format=LibbyClient.get_file_extension(format_id).upper(),
+            book=as_unicode(get_media_title(loan), errors="replace"),
+        )
+        
+        callback = Dispatcher(self.import_finished)
+        
+        from calibre.gui2.threaded_jobs import ThreadedJob
+        job = ThreadedJob(
+            "overdrive_libby_import",
+            description,
+            self._do_import_job,
+            (downloader, self.gui, loan, card, library, format_id, file_path, book_id, tags, metadata),
+            {},
+            callback,
+            max_concurrent_count=1,
+            killable=False,
+        )
+        self.gui.job_manager.run_threaded_job(job)
+        self.gui.status_bar.show_message(description, 3000)
+
+    def _do_import_job(self, downloader, gui, loan, card, library, format_id, file_path, book_id, tags, metadata, log=None, abort=None, notifications=None):
+        try:
+            downloader.add(
+                gui,
+                loan,
+                card,
+                library,
+                format_id,
+                file_path,
+                book_id,
+                tags,
+                metadata,
+            )
+        finally:
+            try:
+                file_path.unlink(missing_ok=True)
+            except Exception as e:
+                CustomLogger.logger.warning(f"Could not remove temp file: {e}")
+        return loan
+
+    def import_finished(self, job):
+        if job.failed:
+            return self.unhandled_exception(
+                job.exception, msg=_("Failed to import downloaded file")
+            )
+        self.loan_added.emit(job.result)
+        self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
 
     def openLibbyDownload(self, loan) :
         libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
