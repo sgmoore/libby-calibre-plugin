@@ -47,7 +47,7 @@ class CustomEbookDownload(LibbyDownload):
     ):
         if not tags:
             tags = []
-        downloaded_filepath: Optional[Path] = None
+        handled_asynchronously = False
         try:
             downloaded_filepath = self._custom_download(
                 libby_client,
@@ -57,7 +57,7 @@ class CustomEbookDownload(LibbyDownload):
                 abort=abort,
                 notifications=notifications,
             )
-            self.add(
+            handled_asynchronously = self.add(
                 gui,
                 loan,
                 card,
@@ -70,11 +70,12 @@ class CustomEbookDownload(LibbyDownload):
             )
 
         finally:
-            try:
-                if downloaded_filepath:
-                    downloaded_filepath.unlink(missing_ok=True)
-            except:  # noqa
-                pass
+            if not handled_asynchronously:
+                try:
+                    if downloaded_filepath:
+                        downloaded_filepath.unlink(missing_ok=True)
+                except:  # noqa
+                    pass
         return loan
 
     def _custom_download(

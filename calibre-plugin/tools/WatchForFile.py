@@ -1,6 +1,8 @@
 import os
 import time
 import datetime
+import xml.etree.ElementTree as ET
+import zipfile
 from qt.core import QTimer, QEventLoop, QObject, pyqtSignal, QFileSystemWatcher
 from tempfile import gettempdir
 from shutil import move
@@ -65,6 +67,27 @@ class FileWaiter(QObject):
         self.timeout_timer.stop()
         self.watcher.removePath(self.folder)
                                 
+def is_file_ready(path: str, extension: str) -> bool:
+    """
+    Check if a file is ready for processing by validating its structure.
+    Returns True if valid, False otherwise.
+    """
+    try:
+        # Check if we can open for reading (handles Windows locks)
+        with open(path, 'rb') as f:
+            if extension.lower() == '.acsm':
+                # Validate XML structure
+                ET.parse(f)
+                return True
+            elif extension.lower() == '.epub':
+                # Validate ZIP structure
+                return zipfile.is_zipfile(path)
+            else:
+                # Default for other types: just ensure it's not empty
+                return os.path.getsize(path) > 0
+    except (IOError, OSError, ET.ParseError, zipfile.BadZipFile):
+        return False
+
 def wait_for_file_qt(folder : str, extension : str,  interval_ms = 500, timeout_ms=300000, cancel_callback=None) -> Optional[Path]:    # 300000 = 5 minutes
     loop = QEventLoop()
     waiter = FileWaiter(folder, extension, interval_ms , timeout_ms, cancel_callback)
@@ -85,14 +108,27 @@ def wait_for_file_qt(folder : str, extension : str,  interval_ms = 500, timeout_
     loop.exec_()
 
     file_path = result['path']
-    if file_path :
+    if file_path:
+        # Wait for file to be logically complete (valid XML/ZIP)
+        # Timeout after 60 seconds of existence if it never becomes valid
+        start_wait = time.time()
+        ready = False
+        while time.time() - start_wait < 60:
+            if is_file_ready(file_path, extension):
+                ready = True
+                break
+            time.sleep(0.1) # 100ms poll
+            
+        if not ready:
+            CustomLogger.log_simple_string(f"File {file_path} was found but never became valid (timeout).")
+            return None
 
         temp_path = os.path.join(gettempdir() , os.path.basename(file_path))
         print(f"Moving {file_path} to {temp_path}")
         move(file_path, temp_path)
 
         return Path(temp_path)
-    else :
+    else:
         return None
 
 

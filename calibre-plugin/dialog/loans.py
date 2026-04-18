@@ -445,7 +445,7 @@ class LoansDialogMixin(BaseDialogMixin):
             book=as_unicode(get_media_title(loan), errors="replace"),
         )
         
-        callback = Dispatcher(self.import_finished)
+        callback = Dispatcher(self.downloaded_loan)
         
         from calibre.gui2.threaded_jobs import ThreadedJob
         job = ThreadedJob(
@@ -462,8 +462,9 @@ class LoansDialogMixin(BaseDialogMixin):
         self.gui.status_bar.show_message(description, 3000)
 
     def _do_import_job(self, downloader, gui, loan, card, library, format_id, file_path, book_id, tags, metadata, log=None, abort=None, notifications=None):
+        handled_asynchronously = False
         try:
-            downloader.add(
+            handled_asynchronously = downloader.add(
                 gui,
                 loan,
                 card,
@@ -475,19 +476,12 @@ class LoansDialogMixin(BaseDialogMixin):
                 metadata,
             )
         finally:
-            try:
-                file_path.unlink(missing_ok=True)
-            except Exception as e:
-                CustomLogger.logger.warning(f"Could not remove temp file: {e}")
+            if not handled_asynchronously:
+                try:
+                    file_path.unlink(missing_ok=True)
+                except Exception as e:
+                    CustomLogger.logger.warning(f"Could not remove temp file: {e}")
         return loan
-
-    def import_finished(self, job):
-        if job.failed:
-            return self.unhandled_exception(
-                job.exception, msg=_("Failed to import downloaded file")
-            )
-        self.loan_added.emit(job.result)
-        self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
 
     def openLibbyDownload(self, loan) :
         libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
