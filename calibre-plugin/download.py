@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre.ebooks.metadata.worker import run_import_plugins
+from calibre.gui2 import Dispatcher
 
 from .config import PREFS, PreferenceKeys
 from .libby import LibbyClient
@@ -182,7 +183,7 @@ class LibbyDownload:
         book_id: int = 0,
         tags: Optional[List[str]] = None,
         metadata=None,
-    ) -> None:
+    ) -> bool:
         """
         Adds the new downloaded book to calibre db
 
@@ -214,6 +215,29 @@ class LibbyDownload:
             )[0]
             new_ext = Path(new_path).suffix[1:]
 
+            if new_ext.lower() == "acsm":
+                # For ACSM files, we MUST use Calibre's standard Add Books action
+                # to ensure that FileType plugins like DeACSM are triggered correctly.
+                # Update metadata anyway since we matched it
+                metadata = self.update_metadata(gui, loan, library, format_id, metadata, tags)
+                db.set_metadata(book_id, metadata)
+                self.update_custom_columns(book_id, loan, db)
+                if PREFS[PreferenceKeys.MARK_UPDATED_BOOKS]:
+                    gui.current_db.set_marked_ids([book_id])
+                gui.library_view.model().refresh_ids([book_id])
+
+                def trigger_add():
+                    add_books_action = gui.iactions.get("Add Books")
+                    if add_books_action and hasattr(add_books_action, "_add_formats"):
+                        file_size = os.path.getsize(new_path) if os.path.exists(new_path) else -1
+                        CustomLogger.logger.info(f"Triggering _add_formats for {new_path} ({file_size} bytes)")
+                        add_books_action._add_formats([str(new_path)], [book_id])
+                    else:
+                        CustomLogger.logger.warning("Could not find _add_formats in Add Books action")
+                
+                Dispatcher(trigger_add)()
+                return True
+
             # if book_id is found, it's an empty book, download and add the epub/pdf as a format
             successfully_added = db.add_format(
                 book_id, new_ext.upper(), new_path, replace=False
@@ -233,6 +257,7 @@ class LibbyDownload:
                 if PREFS[PreferenceKeys.MARK_UPDATED_BOOKS]:
                     gui.current_db.set_marked_ids([book_id])  # mark updated book
                 gui.library_view.model().refresh_ids([book_id])
+
         else:
             # add as a new book
 
@@ -253,9 +278,30 @@ class LibbyDownload:
                 gui, loan, library, format_id, metadata, tags
             )
             book_id = gui.library_view.model().db.create_book_entry(metadata)
+            self.update_custom_columns(book_id, loan, db)
+
+            if new_ext.lower() == "acsm":
+                # For ACSM files, we MUST use Calibre's standard Add Books action
+                # to ensure that FileType plugins like DeACSM are triggered correctly.
+                
+                def trigger_add():
+                    add_books_action = gui.iactions.get("Add Books")
+                    if add_books_action and hasattr(add_books_action, "_add_formats"):
+                        file_size = os.path.getsize(new_path) if os.path.exists(new_path) else -1
+                        CustomLogger.logger.info(f"Triggering _add_formats for new book {new_path} ({file_size} bytes)")
+                        add_books_action._add_formats([str(new_path)], [book_id])
+                    else:
+                        CustomLogger.logger.warning("Could not find _add_formats in Add Books action")
+                
+                Dispatcher(trigger_add)()
+                gui.library_view.model().books_added(1)
+                gui.library_view.model().count_changed()
+                return True
+
             gui.library_view.model().db.add_format_with_hooks(
                 book_id, new_ext.upper(), new_path, index_is_id=True
             )
-            self.update_custom_columns(book_id, loan, db)
             gui.library_view.model().books_added(1)
             gui.library_view.model().count_changed()
+
+        return False
