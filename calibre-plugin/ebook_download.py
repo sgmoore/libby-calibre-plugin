@@ -71,16 +71,7 @@ class CustomEbookDownload(LibbyDownload):
             downloaded_filepath = wait_for_file_qt(folder , file_ext )
             CustomLogger.log_simple_string(f"filename : {downloaded_filepath}")
 
-            
-            # if not downloaded_filepath :
-            #     downloaded_filepath = self._custom_download(
-            #         libby_client,
-            #         loan,
-            #         format_id,
-            #         filename,
-            #         abort=abort,
-            #         notifications=notifications,
-            #     )
+                     
             if downloaded_filepath :
                 self.add(
                 gui,

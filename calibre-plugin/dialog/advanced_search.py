@@ -447,10 +447,6 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         elif self.subject_fiction_rb.isChecked():
             subject_id = "26"
 
-        # if self.adv_query_txt.text().upper().startswith("Test:") :
-        #     cmdline = self.adv_query_txt.text()[5:]
-
-
         query = LibraryMediaSearchParams(
             query=self.adv_query_txt.text(),
             title=self.title_txt.text(),

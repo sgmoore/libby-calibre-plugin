@@ -105,11 +105,6 @@ class PreferenceKeys:
     PREFER_OVERDRIVE_WEBSITES = "prefer_overdrive_websites"
 
 
-# class BorrowActions:
-#     BORROW = "borrow"
-#     BORROW_AND_DOWNLOAD = "borrow_and_download"
-#     BORROW_AND_OPEN = "borrow_and_open"
-
 class BorrowActions(IntEnum):
     BORROW = 1
     BORROW_AND_DOWNLOAD = 2
@@ -194,7 +189,7 @@ PREFS.defaults[PreferenceKeys.MAIN_UI_HEIGHT] = 0
 PREFS.defaults[PreferenceKeys.MAGAZINE_SUBSCRIPTIONS] = []
 PREFS.defaults[PreferenceKeys.LAST_SELECTED_TAB] = 0
 PREFS.defaults[PreferenceKeys.SEARCH_MODE] = SearchMode.BASIC
-PREFS.defaults[PreferenceKeys.DOWNLOADS_FOLDER] = None
+PREFS.defaults[PreferenceKeys.DOWNLOADS_FOLDER] = "~/Downloads"
 PREFS.defaults[PreferenceKeys.BORROW_ACTION_EBOOKS] = BorrowActions.BORROW
 PREFS.defaults[PreferenceKeys.BORROW_ACTION_OTHERS] = BorrowActions.BORROW
 PREFS.defaults[PreferenceKeys.PREFER_OVERDRIVE_WEBSITES] = False
@@ -725,29 +720,7 @@ class ConfigWidget(QWidget):
         )
         general_layout.addRow(self.disable_tab_magazines_checkbox)
 
- #       # Use browser-assisted download
- #       self.use_browser_download_checkbox = QCheckBox(
- #          PreferenceTexts.USE_BROWSER_DOWNLOAD
- #       )
- #       self.use_browser_download_checkbox.setToolTip(
- #           _("When enabled, the plugin will watch the downloads folder for the file after opening Libby in the browser.")
- #       )
- #       self.use_browser_download_checkbox.setChecked(
- #           PREFS[PreferenceKeys.USE_BROWSER_DOWNLOAD]
- #       )
- #       general_layout.addRow(self.use_browser_download_checkbox)
-
-       # Downloads folder
-        self.downloads_folder_txt = QLineEdit(self)
-        self.downloads_folder_txt.setToolTip(
-           _("The folder where your browser saves downloaded files (e.g., .acsm or .epub).")
-        )
-        self.downloads_folder_txt.setPlaceholderText(_("Path to your Downloads folder"))
-        if not DEMO_MODE:
-           self.downloads_folder_txt.setText(PREFS[PreferenceKeys.DOWNLOADS_FOLDER])
-        general_layout.addRow(PreferenceTexts.DOWNLOADS_FOLDER, self.downloads_folder_txt)
-
-        # Include non-downloadables
+         # Include non-downloadables
         self.incl_nondownloadable_checkbox = QCheckBox(
             PreferenceTexts.INCL_NONDOWNLOADABLE_TITLES
         )
@@ -1091,7 +1064,8 @@ class ConfigWidget(QWidget):
         PREFS[PreferenceKeys.CACHE_AGE_DAYS] = int(
             self.cache_age_txt.cleanText().strip()
         )
-        PREFS[PreferenceKeys.DOWNLOADS_FOLDER] = self.downloads_folder_txt.text().strip()
+
+        PREFS[PreferenceKeys.DOWNLOADS_FOLDER] = self.downloads_folder.text().strip()
         PREFS[PreferenceKeys.BORROW_ACTION_EBOOKS] = self.cbBorrowActionEbooks.currentData()
         PREFS[PreferenceKeys.BORROW_ACTION_OTHERS] = self.cbBorrowActionOthers.currentData()
 

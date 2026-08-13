@@ -376,17 +376,6 @@ class HoldsDialogMixin(BaseDialogMixin):
             d.setModal(True)
             d.open()
 
-
-  
-
-    # def borrow_hold(self, hold, availability=None):
-    #     warnings.warn(
-    #         "borrow_hold() is deprecated; use borrow_book() instead",
-    #         category=DeprecationWarning,
-    #         stacklevel=2
-    #     )
-    #     self.borrow_book(hold, availability)            
-
     # Note : This is also called when we borrow a book from the search screen
     # So hold is technically not the term.
     # Also this uses self.holds_model.get_card - is that different from LibbySearchModel

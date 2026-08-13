@@ -592,14 +592,14 @@ class LoansDialogMixin(BaseDialogMixin):
         error_message = None
         details = None
         if not downloads_folder:
-            error_message = _("Downloads Folder Not Set"),
-            details = _("Please configure your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading."),
+            error_message = _("Downloads Folder Not Set")
+            details = _("Please configure your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading.")
         else :        
             downloads_folder = expanduser(downloads_folder)
     
             if not isdir(downloads_folder) :
-               error_message = _("Specified Downloads Folder does not exist"),
-               details = _("Please correct your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading."),
+               error_message = _("Specified Downloads Folder does not exist")
+               details = _("Please correct your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading.")
         
         if error_message :
             error_dialog(self, error_message, details, show=True )
