@@ -2,7 +2,7 @@ import traceback
 import sys
 from functools import wraps
 from inspect import signature
-from typing import Any
+from typing import Any , get_origin, get_args
 from .guiMode import GuiMode
 
 def enforce_types(func):
@@ -17,11 +17,11 @@ def enforce_types(func):
             bound_args = sig.bind(*args, **kwargs)
             for name, value in bound_args.arguments.items():
                 expected_type = func.__annotations__.get(name)
-                if expected_type and not expected_type == Any and not isinstance(value, expected_type):
+                if expected_type and not expected_type == Any and not check_type(value, expected_type):
                     display_error(f"Argument '{name}' must be {expected_type}, got {type(value)} ({value})")
             result = func(*args, **kwargs)
 
-            if return_type and not return_type == Any and return_type is not None and not isinstance(result, return_type):
+            if return_type and not return_type == Any and return_type is not None and not check_type(result, return_type):
                 display_error(f"Return value must be {return_type}, got {type(result)} ({result})")
             elif return_type is None and result is not None :
                 display_error(f"Expected no return value, but got {type(result)} ({result})")
@@ -31,6 +31,25 @@ def enforce_types(func):
     else :
         return func 
 
+def check_type(value, expected_type):
+    if not expected_type or expected_type is Any:
+        return True
+
+    origin = get_origin(expected_type)
+    args   = get_args(expected_type)
+
+    if origin is list:
+        if not isinstance(value, list):
+            return False
+        if not args:  # List without parameters
+            return True
+        elem_type = args[0]
+        if elem_type is Any:
+            return True
+        return all(isinstance(x, elem_type) for x in value)
+        
+    # fallback for non-parameterized types
+    return isinstance(value, expected_type)
 
 
 def display_error(message : str) :

@@ -66,6 +66,10 @@ class CustomLogger:
  
   
     @staticmethod
+    def __call__(*args, **kwargs):
+        CustomLogger.logger.info(*args, **kwargs)
+
+    @staticmethod
     def log_simple_string(input : str):
         if CustomLogger.logger.level <= logging.DEBUG: 
             CustomLogger.logger.debug(Redactor._redact_simple_string(input))

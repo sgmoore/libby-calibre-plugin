@@ -1,6 +1,6 @@
 # This file does not contain any tests, but serves as a template for future test files.
 
-from typing import Dict , TYPE_CHECKING
+from typing import Dict , List, TYPE_CHECKING
 from all import RunnableTests
 from urllib.request import Request
 
@@ -32,6 +32,27 @@ def method4(data: Dict, s : str , b : bool ) -> None :
 def method5(data: Dict, s : str , b : bool ) -> None :
     return True # pyright: ignore[reportReturnType]
 
+@enforce_types
+def method_with_generic_return1(s : str , b : bool ) -> List[str] :
+    return True # pyright: ignore[reportReturnType]
+
+@enforce_types
+def method_with_generic_return2(s : str , b : bool ) -> List[str] :
+    return [1, 2 , 3] # pyright: ignore[reportReturnType]
+
+def method_with_generic_return3(s : str , b : bool ) -> List[str] :
+    return ['a', 'b' , 'c']
+
+@enforce_types
+def method_with_generic_type1(list : List[str] , b : bool ) -> List[str] : 
+    return list
+ 
+def method_with_generic_type2(list : List[str] , b : bool ) -> List[str]:
+     return list 
+
+
+
+
 class DecoratorTests(RunnableTests):
 
     def test_enforce_types(self):
@@ -60,6 +81,28 @@ class DecoratorTests(RunnableTests):
         self.assertEqual(str(cm.exception),  "Expected no return value, but got <class 'bool'> (True)")
         
         method5({}, "Test", False)   # This should not fail because the type hints are not enforced
+
+    def test_enforce_generic_return_types(self):
+        with self.assertRaises(TypeError) as cm:
+            method_with_generic_return1("Test", False)    # pyright: ignore[reportArgumentType]
+        self.assertEqual(str(cm.exception), "Return value must be typing.List[str], got <class 'bool'> (True)")
+
+        with self.assertRaises(TypeError) as cm:
+            method_with_generic_return2("Test", False)    # pyright: ignore[reportArgumentType]        
+        self.assertEqual(str(cm.exception), "Return value must be typing.List[str], got <class 'list'> ([1, 2, 3])")
+
+        method_with_generic_return3("Test", False)    # This should not fail because the type hints are not enforced
+
+    def test_enforce_generic_types(self):
+        list = [1, 2, 3]
+        with self.assertRaises(TypeError) as cm:
+            method_with_generic_type1(list, False)      # pyright: ignore[reportArgumentType]
+        self.assertEqual(str(cm.exception), "Argument 'list' must be typing.List[str], got <class 'list'> ([1, 2, 3])")
+
+        method_with_generic_type2(list, False)    # pyright: ignore[reportArgumentType]         # This should not fail because the type hints are not enforced
+
+        method_with_generic_type1(['a', 'b' , 'c'], False)    # This should not fail because the types are correct
+
 
     def test_decorators_for_logging(self) :
 

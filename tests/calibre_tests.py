@@ -87,7 +87,14 @@ class _CalibreTests(RunnableTests):
 
         self.assertGreater(logger.level, 0 , f"Logger level {level_name} should be greater than 0")
 
-   
+    def test__standard_log(self):    
+        from calibre.utils.logging import default_log 
+        default_log.info("Default Log %s :: %s" , "x" , "y")
+        default_log.info("Default Log %s "  % "Test")
+        default_log.info("Default Log %s :: %s"  % ( "x" , "y"))
+
+        CustomLogger.logger.info("Test %s ::  %s", "x" , "y")
+
 
 # Run with:
 # All tests: calibre-customize -b calibre-plugin && calibre-debug -e tests/calibre_tests.py
