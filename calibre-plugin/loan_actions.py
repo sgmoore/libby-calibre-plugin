@@ -14,7 +14,6 @@ from typing import Dict
 
 from .libby import LibbyClient
 from .models import get_media_title
-from .tools.CustomLogger import CustomLogger
 
 from typing import TYPE_CHECKING
 
@@ -36,9 +35,11 @@ class LibbyLoanReturn:
         abort=None,
         notifications=None,
     ):
-        notifications.put((0.5, _("Returning")))
+        if notifications :
+            notifications.put((0.5, _("Returning")))
         libby_client.return_loan(loan)
-        CustomLogger.logger.info("Returned %s successfully.", get_media_title(loan))
+        if log :
+            log.info(f"Returned {get_media_title(loan)} successfully." )
 
         return loan
 
@@ -53,7 +54,9 @@ class LibbyLoanRenew:
         abort=None,
         notifications=None,
     ):
-        notifications.put((0.5, _("Renewing")))
+        if notifications :
+            notifications.put((0.5, _("Renewing")))
         new_loan = libby_client.renew_loan(loan)
-        CustomLogger.logger.info("Renewed %s successfully.", get_media_title(loan))
+        if log :
+            log.info(f"Renewed {get_media_title(loan)} successfully.")
         return new_loan

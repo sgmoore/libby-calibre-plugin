@@ -29,7 +29,7 @@ from ..compat import (
     _c,
 )
 from ..config import (
-    BorrowActions,
+    # BorrowActions,
     PREFS,
     PreferenceKeys,
     SearchMode,
@@ -41,6 +41,7 @@ from ..models import (
 )
 from ..utils import PluginImages
 from ..workers import OverDriveMediaSearchWorker
+from ..tools.CustomLogger import CustomLogger
 
 from typing import TYPE_CHECKING
 
@@ -132,14 +133,8 @@ class SearchDialogMixin(SearchBaseDialog):
         self.toggle_search_mode_btn.clicked.connect(self.toggle_search_mode_btn_clicked)
         search_widget.layout.addWidget(self.toggle_search_mode_btn, widget_row_pos, 0)
 
-        borrow_action_default_is_borrow = PREFS[
-            PreferenceKeys.LAST_BORROW_ACTION
-        ] == BorrowActions.BORROW or not hasattr(self, "download_loan")
-
         self.search_borrow_btn = DefaultQPushButton(
-            _("Borrow")
-            if borrow_action_default_is_borrow
-            else _("Borrow and Download"),
+            _("Borrow"),
             self.resources[PluginImages.Add],
             self,
         )
@@ -165,7 +160,6 @@ class SearchDialogMixin(SearchBaseDialog):
         for col_num in range(0, search_widget.layout.columnCount() - 3):
             search_widget.layout.setColumnStretch(col_num, 1)
         self.search_tab_index = self.add_tab(search_widget, _c("Search"))
-        self.last_borrow_action_changed.connect(self.rebind_search_borrow_btn)
         self.sync_starting.connect(self.base_sync_starting_search)
         self.sync_ended.connect(self.base_sync_ended_search)
         self.loan_added.connect(self.loan_added_search)
@@ -203,18 +197,6 @@ class SearchDialogMixin(SearchBaseDialog):
         self.search_borrow_btn.setEnabled(True)
         self.search_model.sync(value)
 
-    def rebind_search_borrow_btn(self, last_borrow_action: str):
-        borrow_action_default_is_borrow = (
-            last_borrow_action == BorrowActions.BORROW
-            or not hasattr(self, "download_loan")
-        )
-        self.search_borrow_btn.setText(
-            _("Borrow") if borrow_action_default_is_borrow else _("Borrow and Download")
-        )
-        self.search_borrow_btn.borrow_menu = None
-        self.search_borrow_btn.setMenu(None)
-        self.search_results_view.selectionModel().clearSelection()
-
     def search_for(self, text: str):
         self.tabs.setCurrentIndex(self.search_tab_index)
         self.query_txt.setText(text)
@@ -241,6 +223,8 @@ class SearchDialogMixin(SearchBaseDialog):
         self.search_hold_btn.hold_menu = None
         self.search_hold_btn.setMenu(None)
         self.search_hold_btn.setEnabled(True)
+        CustomLogger.logger.debug("_reset_borrow_hold_buttons : clearing menu")
+
 
     def search_btn_clicked(self):
         self.search_model.sync({"search_results": []})

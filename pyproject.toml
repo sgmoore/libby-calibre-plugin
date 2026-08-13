@@ -6,3 +6,7 @@ pythonVersion = "3.8"
 
 [tool.ruff]
 target-version = "py38"
+
+[tool.ty.environment]
+# root = ["./calibre-plugin" ,  "./tests"]
+extra-paths = ["../calibre/src/"]

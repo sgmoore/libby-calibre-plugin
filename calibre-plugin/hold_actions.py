@@ -14,7 +14,6 @@ from typing import Dict
 
 from .libby import LibbyClient
 from .models import get_media_title
-from .tools.CustomLogger import CustomLogger
 
 from typing import TYPE_CHECKING
 
@@ -36,9 +35,11 @@ class LibbyHoldCancel:
         notifications=None,
     ):
 
-        notifications.put((0.5, _("Cancelling")))
+        if notifications :
+            notifications.put((0.5, _("Cancelling")))
         libby_client.cancel_hold(hold)
-        CustomLogger.logger.info("Cancelled hold for %s successfully.", get_media_title(hold))
+        if log :
+            log.info(f"Cancelled hold for {get_media_title(hold)} successfully.", )
         return hold
 
 
@@ -53,9 +54,11 @@ class LibbyHoldUpdate:
         abort=None,
         notifications=None,
     ):
-        notifications.put((0.5, _("Updating hold")))
+        if notifications :
+            notifications.put((0.5, _("Updating hold")))
         hold = libby_client.suspend_hold(hold, days_to_suspend)
-        CustomLogger.logger.info("Updated hold for %s successfully.", get_media_title(hold))
+        if log :
+            log.info(f"Updated hold for {get_media_title(hold)} successfully.")
         return hold
 
 
@@ -71,11 +74,9 @@ class LibbyHoldCreate:
         notifications=None,
     ):
 
-        notifications.put((0.5, _("Creating hold")))
+        if notifications :
+            notifications.put((0.5, _("Creating hold")))
         hold = libby_client.create_hold(media["id"], card["cardId"])
-        CustomLogger.logger.info(
-            "Created hold for %s at %s successfully.",
-            get_media_title(hold),
-            card["advantageKey"],
-        )
+        if log :
+            log.info(f'Created hold for {get_media_title(hold)} at {card["advantageKey"]} successfully.' )
         return hold

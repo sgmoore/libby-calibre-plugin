@@ -11,6 +11,7 @@
 #
 
 import time
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -203,19 +204,28 @@ class LibbyDownload:
         ext = downloaded_file.suffix[1:]  # remove the "." suffix
 
         if book_id and metadata:
-            CustomLogger.logger.info(
-                "Adding %s format to existing book %s", ext.upper(), metadata.title
-            )
-            # we have to run_import_plugins first so that we can get
-            # the correct metadata for the .acsm
-            new_path = run_import_plugins(
-                (str(downloaded_file),),
-                time.monotonic_ns(),
-                str(downloaded_file.parent),
-            )[0]
-            new_ext = Path(new_path).suffix[1:]
+            CustomLogger.logger.debug("LibbyDownload : Adding %s format to existing book %s", ext.upper(), metadata.title)
+        else :
+            CustomLogger.logger.debug("LibbyDownload : Adding %s format as new book ", ext.upper() )
+
+        CustomLogger.logger.debug("Running import plugins")
+        # we have to run_import_plugins first so that we can get
+        # the correct metadata for the .acsm
+        new_path = run_import_plugins(
+            (str(downloaded_file),),
+            time.monotonic_ns(),
+            str(downloaded_file.parent),
+        )[0]
+        new_ext = Path(new_path).suffix[1:]
+        CustomLogger.logger.debug("Finished Running import plugins")
+        CustomLogger.logger.info(f'New ext {new_ext} from {new_path}')
+        CustomLogger.logger.info(f'old file {downloaded_file} exists = {os.path.exists(downloaded_file)}' )
+
+        if book_id and metadata:
 
             if new_ext.lower() == "acsm":
+                CustomLogger.logger.info("special acsm handling - Adding %s format to existing book %s", ext.upper(), metadata.title)
+
                 # For ACSM files, we MUST use Calibre's standard Add Books action
                 # to ensure that FileType plugins like DeACSM are triggered correctly.
                 # Update metadata anyway since we matched it
@@ -259,16 +269,8 @@ class LibbyDownload:
                 gui.library_view.model().refresh_ids([book_id])
 
         else:
+            CustomLogger.logger.info("Adding %s format as new book ", new_ext )
             # add as a new book
-
-            # we have to run_import_plugins first so that we can get
-            # the correct metadata for the .acsm
-            new_path = run_import_plugins(
-                (str(downloaded_file),),
-                time.monotonic_ns(),
-                str(downloaded_file.parent),
-            )[0]
-            new_ext = Path(new_path).suffix[1:]
 
             # Reference: https://github.com/kovidgoyal/calibre/blob/58c609fa7db3a8df59981c3bf73823fa1862c392/src/calibre/gui2/ebook_download.py#L108-L116
             with open(new_path, "rb") as f:
@@ -283,7 +285,9 @@ class LibbyDownload:
             if new_ext.lower() == "acsm":
                 # For ACSM files, we MUST use Calibre's standard Add Books action
                 # to ensure that FileType plugins like DeACSM are triggered correctly.
-                
+
+                CustomLogger.logger.info("special acsm handling - Adding %s format as new book %s", ext.upper(), metadata.title)
+               
                 def trigger_add():
                     add_books_action = gui.iactions.get("Add Books")
                     if add_books_action and hasattr(add_books_action, "_add_formats"):

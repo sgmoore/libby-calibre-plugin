@@ -42,11 +42,11 @@ class FileWaiter(QObject):
             return
             
         self.extension = self.extension.lower()
-        print(f"checking for {self.extension} in {self.folder}")
+        print(f"{datetime.datetime.now()} checking for {self.extension} in {self.folder}")
         for fname in os.listdir(self.folder):          
             if fname.lower().endswith(self.extension):
                 full_path = os.path.join(self.folder, fname)
-                if os.path.isfile(full_path):
+                if os.path.isfile(full_path) and os.path.getsize(full_path) != 0 : # Ignore folders and zero-byte files.
                     created = os.path.getctime(full_path)
                     if created >= self.start_time :
                         self.file_found.emit(full_path)
@@ -72,6 +72,7 @@ def is_file_ready(path: str, extension: str) -> bool:
     Check if a file is ready for processing by validating its structure.
     Returns True if valid, False otherwise.
     """
+    CustomLogger.log_simple_string(f'Checking existing file {path} Size {os.path.getsize(path)}')
     try:
         # Check if we can open for reading (handles Windows locks)
         with open(path, 'rb') as f:
@@ -81,14 +82,25 @@ def is_file_ready(path: str, extension: str) -> bool:
                 return True
             elif extension.lower() == '.epub':
                 # Validate ZIP structure
-                return zipfile.is_zipfile(path)
+                valid = zipfile.is_zipfile(path)
+                if not valid :
+                    CustomLogger.log_simple_string(f'{path} epub file does not look valid')        
+                return valid
             else:
                 # Default for other types: just ensure it's not empty
                 return os.path.getsize(path) > 0
     except (IOError, OSError, ET.ParseError, zipfile.BadZipFile):
+        CustomLogger.log_simple_string(f'{path} did not validate')
         return False
 
 def wait_for_file_qt(folder : str, extension : str,  interval_ms = 500, timeout_ms=300000, cancel_callback=None) -> Optional[Path]:    # 300000 = 5 minutes
+    
+    assert folder , "folder is required and can not be blank"
+    assert extension , 'Extension is required and can not be blank'
+    
+    if not extension.startswith("."):
+        extension = f".{extension}"
+
     loop = QEventLoop()
     waiter = FileWaiter(folder, extension, interval_ms , timeout_ms, cancel_callback)
 

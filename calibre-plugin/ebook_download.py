@@ -14,11 +14,16 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from calibre.ptempfile import PersistentTemporaryDirectory
+from calibre.gui2 import open_url
 
 from .compat import _c
 from .download import LibbyDownload
 from .libby import LibbyClient
-# from .tools.CustomLogger import CustomLogger
+from .overdrive import OverDriveClient
+from .tools.CustomLogger import CustomLogger
+from .tools.WatchForFile import wait_for_file_qt
+from os.path import expanduser
+from .config import PREFS, PreferenceKeys
 
 from typing import TYPE_CHECKING
 
@@ -45,19 +50,39 @@ class CustomEbookDownload(LibbyDownload):
         abort=None,
         notifications=None,
     ):
+        raise NotImplementedError 
+    
         if not tags:
             tags = []
-        handled_asynchronously = False
+        downloaded_filepath: Optional[Path] = None            
         try:
-            downloaded_filepath = self._custom_download(
-                libby_client,
-                loan,
-                format_id,
-                filename,
-                abort=abort,
-                notifications=notifications,
-            )
-            handled_asynchronously = self.add(
+
+            library_key = library["preferredKey"]
+
+            folder = expanduser(PREFS[PreferenceKeys.DOWNLOADS_FOLDER])
+            file_ext = "." + LibbyClient.get_file_extension(format_id)
+
+            url = OverDriveClient.generate_download_ebook_permalink(library_key, format_id , loan["id"])
+
+            CustomLogger.log_simple_string(f"Opening {url}")
+            open_url(url) 
+            CustomLogger.log_simple_string(f"watching folder : {folder} for file type {file_ext}")
+
+            downloaded_filepath = wait_for_file_qt(folder , file_ext )
+            CustomLogger.log_simple_string(f"filename : {downloaded_filepath}")
+
+            
+            # if not downloaded_filepath :
+            #     downloaded_filepath = self._custom_download(
+            #         libby_client,
+            #         loan,
+            #         format_id,
+            #         filename,
+            #         abort=abort,
+            #         notifications=notifications,
+            #     )
+            if downloaded_filepath :
+                self.add(
                 gui,
                 loan,
                 card,
@@ -70,12 +95,11 @@ class CustomEbookDownload(LibbyDownload):
             )
 
         finally:
-            if not handled_asynchronously:
-                try:
-                    if downloaded_filepath:
-                        downloaded_filepath.unlink(missing_ok=True)
-                except:  # noqa
-                    pass
+            try:
+                if downloaded_filepath:
+                    downloaded_filepath.unlink(missing_ok=True)
+            except:  # noqa
+                pass
         return loan
 
     def _custom_download(

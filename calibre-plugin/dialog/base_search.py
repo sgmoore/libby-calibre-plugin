@@ -16,7 +16,7 @@ from qt.core import Qt, QMenu, QIcon, QCursor
 from .base import BaseDialogMixin
 from .. import DEMO_MODE
 from ..compat import _c
-from ..config import PREFS, PreferenceKeys, BorrowActions
+# from ..config import PREFS, PreferenceKeys, BorrowActions
 from ..libby import LibbyClient
 from ..models import get_media_title, truncate_for_display, get_waitdays_integer 
 from ..utils import PluginImages, obfuscate_name
@@ -90,15 +90,17 @@ class SearchBaseDialog(BaseDialogMixin):
             borrow_btn.setMenu(None)
             hold_btn.borrow_menu = None
             hold_btn.setMenu(None)
+            CustomLogger.logger.debug("view_selection_model_selectionchanged  : no selection so clearing menu")
             return
 
         indices = selection_model.selectedRows()
         media = indices[-1].data(Qt.UserRole)
         self.status_bar.showMessage(get_media_title(media, include_subtitle=True), 3000)
 
-        borrow_action_default_is_borrow = PREFS[
-            PreferenceKeys.LAST_BORROW_ACTION
-        ] == BorrowActions.BORROW or not hasattr(self, "download_loan")
+     
+        self.update_borrow_btn_text(media, borrow_btn)
+
+   
 
         available_sites = self.get_available_sites(media, model)
 
@@ -158,18 +160,19 @@ class SearchBaseDialog(BaseDialogMixin):
                     media_for_borrow["cardId"] = card["cardId"]
                     card_action.triggered.connect(
                         # this is from the holds tab
-                        lambda checked, m=media_for_borrow, s=site: self.borrow_hold(
+                        lambda checked, m=media_for_borrow, s=site: self.borrow_book(
                             m,
-                            availability=s,
-                            do_download=not borrow_action_default_is_borrow,
+                            availability=s
                         )
                     )
             borrow_btn.setEnabled(True)
+            # borrow_btn.setText()
             borrow_btn.borrow_menu = borrow_menu
             CustomLogger.logger.debug("view_selection_model_selectionchanged  : setting menu")
             borrow_btn.setMenu(borrow_menu)
         else:
             borrow_btn.borrow_menu = None
+            CustomLogger.logger.debug("view_selection_model_selectionchanged  :no sites so clearing menu")
             borrow_btn.setMenu(None)
             borrow_btn.setEnabled(False)
 

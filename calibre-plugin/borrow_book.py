@@ -39,13 +39,12 @@ class LibbyBorrowMedia:
         abort=None,
         notifications=None,
     ):
-        notifications.put((0.5, _("Borrowing")))
+        if notifications :
+            notifications.put((0.5, _("Borrowing")))
         loan = libby_client.borrow_media(media, card, is_lucky_day_loan)
-        CustomLogger.logger.info(
-            "Borrowed %s successfully from %s.",
-            get_media_title(loan),
-            card["advantageKey"],
-        )
+        if log :
+            log.info(f'Borrowed {get_media_title(loan)} successfully from {card["advantageKey"]}.' )
+            
         if "cardId" not in loan:
             CustomLogger.logger.warning("Loan info returned does not have cardId")
             if media.get("cardId"):  # from a hold

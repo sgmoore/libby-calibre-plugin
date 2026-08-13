@@ -28,7 +28,9 @@ from .tools.CustomLogger import CustomLogger
 
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
+    from calibre.utils.localization import _
     from .tools.lint_helper import load_translations
 
 load_translations()
@@ -142,6 +144,9 @@ class EmptyBookDownload(LibbyDownload):
         notifications=None,
     ):
 
+        if notifications :
+            notifications.put((0.5, _("Creating Empty entry")))
+
         if not tags:
             tags = []
         db = gui.current_db.new_api
@@ -161,6 +166,9 @@ class EmptyBookDownload(LibbyDownload):
             if PREFS[PreferenceKeys.MARK_UPDATED_BOOKS]:
                 gui.current_db.set_marked_ids([book_id])  # mark updated book
             gui.library_view.model().refresh_ids([book_id])
+
+            if log :
+                log.info(f'Book already exists (id={book_id})')
         else:
             metadata = Metadata(
                 title=get_media_title(loan),
@@ -178,7 +186,12 @@ class EmptyBookDownload(LibbyDownload):
             self._add_bundled_content(
                 db, client, book_id, loan, abort, notifications
             )
+            if log :
+                log.info(f'New book created (id={book_id})')
+
             gui.library_view.model().books_added(1)
             gui.library_view.model().count_changed()
 
+        if log :
+            log.info("Job Completed")
         return loan

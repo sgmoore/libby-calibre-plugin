@@ -40,7 +40,7 @@ from ..compat import (
     _c,
 )
 from ..config import (
-    BorrowActions,
+    # BorrowActions,
     PREFS,
     PreferenceKeys,
     SearchMode,
@@ -268,15 +268,10 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             adv_search_widget.layout.addWidget(
                 self.toggle_advsearch_mode_btn, widget_row_pos, 0
             )
-
-        borrow_action_default_is_borrow = PREFS[
-            PreferenceKeys.LAST_BORROW_ACTION
-        ] == BorrowActions.BORROW or not hasattr(self, "download_loan")
+ 
 
         self.adv_search_borrow_btn = DefaultQPushButton(
-            _("Borrow")
-            if borrow_action_default_is_borrow
-            else _("Borrow and Download"),
+            _("Borrow"),
             self.resources[PluginImages.Add],
             self,
         )
@@ -306,7 +301,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.adv_search_tab_index = self.add_tab(
             adv_search_widget, _("Advanced Search")
         )
-        self.last_borrow_action_changed.connect(self.rebind_advsearch_borrow_btn)
+
         self.sync_starting.connect(self.base_sync_starting_advsearch)
         self.sync_ended.connect(self.base_sync_ended_advsearch)
         self.loan_added.connect(self.loan_added_advsearch)
@@ -317,7 +312,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
 
     # Normally the columns on the search results are re-sized automatically, but occasionally I have seen this fail, 
     # so this is a last resort option to allowed you to resize them manually.
-    
+
     def header_context_menu(self, position):
         # Create a context menu
         menu = QMenu()
@@ -341,18 +336,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.adv_search_borrow_btn.setEnabled(True)
         self.adv_search_model.sync(value)
 
-    def rebind_advsearch_borrow_btn(self, last_borrow_action: str):
-        borrow_action_default_is_borrow = (
-            last_borrow_action == BorrowActions.BORROW
-            or not hasattr(self, "download_loan")
-        )
-        self.adv_search_borrow_btn.setText(
-            _("Borrow") if borrow_action_default_is_borrow else _("Borrow and Download")
-        )
-        self.adv_search_borrow_btn.borrow_menu = None
-        self.adv_search_borrow_btn.setMenu(None)
-        self.adv_search_results_view.selectionModel().clearSelection()
-
+   
     def loan_added_advsearch(self, loan: Dict):
         self.adv_search_model.add_loan(loan)
         self.adv_search_results_view.selectionModel().clearSelection()
@@ -389,6 +373,7 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
         self.adv_hold_btn.hold_menu = None
         self.adv_hold_btn.setMenu(None)
         self.adv_hold_btn.setEnabled(True)
+        CustomLogger.logger.debug("adv_reset_borrow_hold_buttons : clearing menu")
 
     def _has_running_search(self, asked_by=None) -> bool:
         for t in self._lib_search_threads:
@@ -461,6 +446,10 @@ class AdvancedSearchDialogMixin(SearchBaseDialog):
             subject_id = "111"
         elif self.subject_fiction_rb.isChecked():
             subject_id = "26"
+
+        # if self.adv_query_txt.text().upper().startswith("Test:") :
+        #     cmdline = self.adv_query_txt.text()[5:]
+
 
         query = LibraryMediaSearchParams(
             query=self.adv_query_txt.text(),

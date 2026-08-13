@@ -7,3 +7,7 @@ Before delving into the code, I thought the only difference between these two se
 
 What this means is that if you make changes to read some of the information returned from the library searches, you need to make sure that the information is available from both searches.
 
+## Libby Tags
+
+There is code relating to tags, but it does not appear to be used.
+Unfortunately tag is used in calibre, when searching for tag does not distinguish between libby and calibre tags

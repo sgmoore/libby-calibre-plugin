@@ -11,10 +11,12 @@
 #
 import time
 from typing import Tuple
+from enum import IntEnum
 
 from calibre import confirm_config_name
 from calibre.gui2 import error_dialog, show_restart_warning
 from calibre.utils.config import JSONConfig
+
 
 try:
     # calibre >= 5.35.0
@@ -25,6 +27,7 @@ except:  # noqa
 from qt.core import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -82,10 +85,9 @@ class PreferenceKeys:
     OVERDRIVELINK_INTEGRATION = "enable_overdrivelink_integration"
     MARK_UPDATED_BOOKS = "mark_updated_books"
     MAGAZINE_SUBSCRIPTIONS = "magazine_subscriptions"
-    # used to toggle the default borrow btn action
-    LAST_BORROW_ACTION = "last_borrow_action"
     LAST_SELECTED_TAB = "last_selected_tab"
     ALWAYS_DOWNLOAD_AS_NEW = "always_download_new"
+    AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING = "automatically_create_entry_in_calibre_after_borrowing"
     NETWORK_TIMEOUT = "network_timeout"
     NETWORK_RETRY = "network_retry"
     SEARCH_RESULTS_MAX = "search_results_max"
@@ -98,12 +100,21 @@ class PreferenceKeys:
     SEARCH_MODE = "search_mode"
     DISABLE_TAB_MAGAZINES = "disable_tab_magazines"
     DOWNLOADS_FOLDER = "downloads_folder"
-    USE_BROWSER_DOWNLOAD = "use_browser_download"
+    BORROW_ACTION_EBOOKS = "borrow_action_ebooks"
+    BORROW_ACTION_OTHERS = "borrow_action_others"
+    PREFER_OVERDRIVE_WEBSITES = "prefer_overdrive_websites"
 
 
-class BorrowActions:
-    BORROW = "borrow"
-    BORROW_AND_DOWNLOAD = "borrow_and_download"
+# class BorrowActions:
+#     BORROW = "borrow"
+#     BORROW_AND_DOWNLOAD = "borrow_and_download"
+#     BORROW_AND_OPEN = "borrow_and_open"
+
+class BorrowActions(IntEnum):
+    BORROW = 1
+    BORROW_AND_DOWNLOAD = 2
+    BORROW_AND_OPEN = 3
+
 
 
 class SearchMode:
@@ -131,6 +142,7 @@ class PreferenceTexts:
     OVERDRIVELINK_INTEGRATION = _("Enable OverDrive Link Plugin integration")
     MARK_UPDATED_BOOKS = _("Mark updated books")
     ALWAYS_DOWNLOAD_AS_NEW = _("Always download as a new book")
+    AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING = _("Automatically Create Entry in calibre after borrowing")
     NETWORK_TIMEOUT = _("Connection timeout")
     NETWORK_RETRY = _c("Retry attempts")
     SEARCH_RESULTS_MAX = _("Maximum search results")
@@ -144,7 +156,7 @@ class PreferenceTexts:
     CACHE_AGE_DAYS = _("Cache data for")
     DISABLE_TAB_MAGAZINES = _("Disable Magazines tab")
     DOWNLOADS_FOLDER = _("Downloads folder")
-    USE_BROWSER_DOWNLOAD = _("Use browser-assisted download")
+    DOWNLOADS_FOLDER_PLACEHOLDER = _("Example: ~/Downloads")
 
 
 PREFS = JSONConfig(f"{PLUGINS_FOLDER_NAME}/{PLUGIN_NAME}")
@@ -166,6 +178,7 @@ PREFS.defaults[confirm_config_name(PreferenceKeys.CONFIRM_READ_WITH_KINDLE)] = T
 PREFS.defaults[PreferenceKeys.OVERDRIVELINK_INTEGRATION] = True
 PREFS.defaults[PreferenceKeys.MARK_UPDATED_BOOKS] = True
 PREFS.defaults[PreferenceKeys.ALWAYS_DOWNLOAD_AS_NEW] = False
+PREFS.defaults[PreferenceKeys.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING] = False
 PREFS.defaults[PreferenceKeys.NETWORK_TIMEOUT] = 30
 PREFS.defaults[PreferenceKeys.NETWORK_RETRY] = 1
 PREFS.defaults[PreferenceKeys.SEARCH_RESULTS_MAX] = 20
@@ -179,11 +192,12 @@ PREFS.defaults[PreferenceKeys.DISABLE_TAB_MAGAZINES] = False
 PREFS.defaults[PreferenceKeys.MAIN_UI_WIDTH] = 0
 PREFS.defaults[PreferenceKeys.MAIN_UI_HEIGHT] = 0
 PREFS.defaults[PreferenceKeys.MAGAZINE_SUBSCRIPTIONS] = []
-PREFS.defaults[PreferenceKeys.LAST_BORROW_ACTION] = BorrowActions.BORROW
 PREFS.defaults[PreferenceKeys.LAST_SELECTED_TAB] = 0
 PREFS.defaults[PreferenceKeys.SEARCH_MODE] = SearchMode.BASIC
-PREFS.defaults[PreferenceKeys.DOWNLOADS_FOLDER] = ""
-PREFS.defaults[PreferenceKeys.USE_BROWSER_DOWNLOAD] = True
+PREFS.defaults[PreferenceKeys.DOWNLOADS_FOLDER] = None
+PREFS.defaults[PreferenceKeys.BORROW_ACTION_EBOOKS] = BorrowActions.BORROW
+PREFS.defaults[PreferenceKeys.BORROW_ACTION_OTHERS] = BorrowActions.BORROW
+PREFS.defaults[PreferenceKeys.PREFER_OVERDRIVE_WEBSITES] = False
 
 
 class ConfigWidget(QWidget):
@@ -414,6 +428,58 @@ class ConfigWidget(QWidget):
             PREFS[PreferenceKeys.ALWAYS_DOWNLOAD_AS_NEW]
         )
         loan_layout.addRow(self.always_download_as_new_checkbox)
+
+        # Automatically Create Entry in calibre after borrowing
+        self.automatically_create_entry_in_calibre_after_borrowing_checkbox = QCheckBox(
+            PreferenceTexts.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING, self
+        )
+        self.automatically_create_entry_in_calibre_after_borrowing_checkbox.setToolTip(
+            _(
+                "Automatically create a blank entry in calibre after borrowing any book, audiobook or magazine."
+            )
+        )
+        self.automatically_create_entry_in_calibre_after_borrowing_checkbox.setChecked(
+            PREFS[PreferenceKeys.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING]
+        )
+        loan_layout.addRow(self.automatically_create_entry_in_calibre_after_borrowing_checkbox)
+
+        translations = {
+            BorrowActions.BORROW                : _("Borrow only"),
+            BorrowActions.BORROW_AND_DOWNLOAD   : _("Borrow, download and import ebook"),
+            BorrowActions.BORROW_AND_OPEN       : _("Read/Play in browser")
+        }
+
+    
+        self.cbBorrowActionEbooks = QComboBox()
+        self.cbBorrowActionOthers = QComboBox()
+        for action in BorrowActions:
+            self.cbBorrowActionEbooks.addItem(translations[action], action)
+            if action != BorrowActions.BORROW_AND_DOWNLOAD :
+                self.cbBorrowActionOthers.addItem(translations[action], action)
+                                   
+        for i in range(self.cbBorrowActionEbooks.count()):
+            if self.cbBorrowActionEbooks.itemData(i) == PREFS[PreferenceKeys.BORROW_ACTION_EBOOKS] :
+                self.cbBorrowActionEbooks.setCurrentIndex(i)
+                break             
+
+        for i in range(self.cbBorrowActionOthers.count()):
+            if self.cbBorrowActionOthers.itemData(i) == PREFS[PreferenceKeys.BORROW_ACTION_OTHERS] :
+                self.cbBorrowActionOthers.setCurrentIndex(i)
+                break             
+
+        self.action_after_borrowing_book_lbl = QLabel(_("Action when borrowing a book"))
+        loan_layout.addRow(self.action_after_borrowing_book_lbl , self.cbBorrowActionEbooks)
+
+        self.action_after_borrowing_non_book_lbl = QLabel(_("Action when borrowing a magazine or audiobook"))
+        loan_layout.addRow( self.action_after_borrowing_non_book_lbl, self.cbBorrowActionOthers)
+
+    
+         # Download folder
+        self.downloads_folder = QLineEdit(self)
+        self.downloads_folder.setToolTip(_("Location of your browser's download folder"))
+        self.downloads_folder.setPlaceholderText(PreferenceTexts.DOWNLOADS_FOLDER_PLACEHOLDER)
+        self.downloads_folder.setText(PREFS[PreferenceKeys.DOWNLOADS_FOLDER])
+        loan_layout.addRow(PreferenceTexts.DOWNLOADS_FOLDER, self.downloads_folder)
 
         # Tag Ebooks
         self.tag_ebooks_txt = QLineEdit(self)
@@ -659,26 +725,26 @@ class ConfigWidget(QWidget):
         )
         general_layout.addRow(self.disable_tab_magazines_checkbox)
 
-        # Use browser-assisted download
-        self.use_browser_download_checkbox = QCheckBox(
-            PreferenceTexts.USE_BROWSER_DOWNLOAD
-        )
-        self.use_browser_download_checkbox.setToolTip(
-            _("When enabled, the plugin will watch the downloads folder for the file after opening Libby in the browser.")
-        )
-        self.use_browser_download_checkbox.setChecked(
-            PREFS[PreferenceKeys.USE_BROWSER_DOWNLOAD]
-        )
-        general_layout.addRow(self.use_browser_download_checkbox)
+ #       # Use browser-assisted download
+ #       self.use_browser_download_checkbox = QCheckBox(
+ #          PreferenceTexts.USE_BROWSER_DOWNLOAD
+ #       )
+ #       self.use_browser_download_checkbox.setToolTip(
+ #           _("When enabled, the plugin will watch the downloads folder for the file after opening Libby in the browser.")
+ #       )
+ #       self.use_browser_download_checkbox.setChecked(
+ #           PREFS[PreferenceKeys.USE_BROWSER_DOWNLOAD]
+ #       )
+ #       general_layout.addRow(self.use_browser_download_checkbox)
 
-        # Downloads folder
+       # Downloads folder
         self.downloads_folder_txt = QLineEdit(self)
         self.downloads_folder_txt.setToolTip(
-            _("The folder where your browser saves downloaded files (e.g., .acsm or .epub).")
+           _("The folder where your browser saves downloaded files (e.g., .acsm or .epub).")
         )
         self.downloads_folder_txt.setPlaceholderText(_("Path to your Downloads folder"))
         if not DEMO_MODE:
-            self.downloads_folder_txt.setText(PREFS[PreferenceKeys.DOWNLOADS_FOLDER])
+           self.downloads_folder_txt.setText(PREFS[PreferenceKeys.DOWNLOADS_FOLDER])
         general_layout.addRow(PreferenceTexts.DOWNLOADS_FOLDER, self.downloads_folder_txt)
 
         # Include non-downloadables
@@ -984,6 +1050,9 @@ class ConfigWidget(QWidget):
         PREFS[
             PreferenceKeys.ALWAYS_DOWNLOAD_AS_NEW
         ] = self.always_download_as_new_checkbox.isChecked()
+        PREFS[
+            PreferenceKeys.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING
+        ] = self.automatically_create_entry_in_calibre_after_borrowing_checkbox.isChecked()
         PREFS[PreferenceKeys.NETWORK_TIMEOUT] = int(
             self.network_timeout_txt.cleanText().strip()
         )
@@ -1023,7 +1092,8 @@ class ConfigWidget(QWidget):
             self.cache_age_txt.cleanText().strip()
         )
         PREFS[PreferenceKeys.DOWNLOADS_FOLDER] = self.downloads_folder_txt.text().strip()
-        PREFS[PreferenceKeys.USE_BROWSER_DOWNLOAD] = self.use_browser_download_checkbox.isChecked()
+        PREFS[PreferenceKeys.BORROW_ACTION_EBOOKS] = self.cbBorrowActionEbooks.currentData()
+        PREFS[PreferenceKeys.BORROW_ACTION_OTHERS] = self.cbBorrowActionOthers.currentData()
 
         if self.custom_column_creator and (
             self.custom_column_creator.gui.must_restart_before_config

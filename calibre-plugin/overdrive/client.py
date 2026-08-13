@@ -296,6 +296,19 @@ class OverDriveClient(object):
         :return:
         """
         return f"https://{library_key}.overdrive.com/media/{title_id}"
+    
+    @staticmethod
+    def generate_download_ebook_permalink(library_key: str, format :str , title_id: str) -> str:
+        """
+        Generates an OverDrive link to download the book 
+
+        :param title_id:
+        :param format
+        :param library_key:
+        :return:
+        """
+
+        return f"https://{library_key}.overdrive.com/media/download/{format}/{title_id}"
 
     @staticmethod
     def get_best_cover_url(media: Dict, rank: int = 0) -> Optional[str]:

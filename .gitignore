@@ -84,3 +84,6 @@ target/
 gitleaks-report.json
 gitleaks_files.cmd
 gitleaks_repo.cmd
+node_modules
+package.json
+package-lock.json

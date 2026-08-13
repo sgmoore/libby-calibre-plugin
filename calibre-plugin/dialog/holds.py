@@ -9,6 +9,7 @@
 #
 # Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
 #
+
 from datetime import datetime, timezone
 from typing import Dict
 
@@ -181,9 +182,7 @@ class HoldsDialogMixin(BaseDialogMixin):
         widget_row_pos += 1
 
         self.holds_tab_index = self.add_tab(widget, _("Holds"))
-        self.last_borrow_action_changed.connect(
-            self.rebind_holds_download_button_and_menu
-        )
+     
         self.sync_starting.connect(self.base_sync_starting_holds)
         self.sync_ended.connect(self.base_sync_ended_holds)
         self.hold_added.connect(self.hold_added_holds)
@@ -224,6 +223,7 @@ class HoldsDialogMixin(BaseDialogMixin):
             if not is_valid_type(hold):
                 continue
             if self.can_hold_be_borrowed(hold) :
+                CustomLogger.log_and_format(hold, 'Hold can be borrowed')
                 available_holds_count += 1
         if available_holds_count:
             self.tabs.setTabText(
@@ -233,21 +233,15 @@ class HoldsDialogMixin(BaseDialogMixin):
         else:
             self.tabs.setTabText(self.holds_tab_index, _("Holds"))
 
-    def rebind_holds_download_button_and_menu(self, borrow_action):
-        self.rebind_borrow_btn(
-            borrow_action, self.holds_borrow_btn, self.do_hold_borrow_action
-        )
-
-    def do_hold_borrow_action(self, do_download=False):
-        self.rebind_borrow_buttons(do_download)
-
+    def do_hold_borrow_action(self):
+ 
         selection_model = self.holds_view.selectionModel()
         if not selection_model.hasSelection():
             return
         indices = selection_model.selectedRows()
         for index in reversed(indices):
             hold = index.data(Qt.UserRole)
-            self.borrow_hold(hold, do_download=do_download)
+            self.borrow_book(hold)
 
     def hide_unavailable_holds_checkbox_state_changed(self, __):
         checked = self.hide_unavailable_holds_checkbox.isChecked()
@@ -274,6 +268,7 @@ class HoldsDialogMixin(BaseDialogMixin):
             hold = index.data(Qt.UserRole)
             card = self.holds_model.get_card(hold["cardId"])
             self.holds_borrow_btn.setEnabled(self.can_hold_be_borrowed(hold))
+            self.update_borrow_btn_text(hold, self.holds_borrow_btn)
             owned_copies = hold.get("ownedCopies", 0)
             if hold.get("estimatedWaitDays") and not self.can_hold_be_borrowed(hold):
                 self.status_bar.showMessage(
@@ -381,14 +376,22 @@ class HoldsDialogMixin(BaseDialogMixin):
             d.setModal(True)
             d.open()
 
-    def borrow_hold(self, hold, availability=None, do_download=False):
 
-        # Attempted fix for code to determine if a hold is a 'lucky day' loan. It is almost impossible to
-        # test this as it would require you to place a hold on a book that is not marked as a lucky day loan
-        # but then have the book changed to be a lucky day loan during the period you have it on hold. Since
-        # the number of lucky day loans is extremely low, that is virtually impossible to predict and test.
-        # Hence if this throws an exception then we fall back to the old code
+  
 
+    # def borrow_hold(self, hold, availability=None):
+    #     warnings.warn(
+    #         "borrow_hold() is deprecated; use borrow_book() instead",
+    #         category=DeprecationWarning,
+    #         stacklevel=2
+    #     )
+    #     self.borrow_book(hold, availability)            
+
+    # Note : This is also called when we borrow a book from the search screen
+    # So hold is technically not the term.
+    # Also this uses self.holds_model.get_card - is that different from LibbySearchModel
+    def borrow_book(self, hold, availability=None):
+       
         try :
             CustomLogger.log_and_format (hold, "Borrowing book")
             if availability is not None :
@@ -397,7 +400,6 @@ class HoldsDialogMixin(BaseDialogMixin):
              CustomLogger.logger.error(f"Error when logging info on book being borrowed{err}")
              return 
 
-      
         try :
             availability_source = availability if availability is not None else hold
             is_lucky_day_loan = bool(availability_source.get("luckyDayAvailableCopies", 0) and not availability_source.get("availableCopies", 0))
@@ -417,9 +419,8 @@ class HoldsDialogMixin(BaseDialogMixin):
         description = _("Borrowing {book}").format(
             book=as_unicode(get_media_title(hold), errors="replace")
         )
-        callback = Dispatcher(
-            self.borrowed_book_and_download if do_download else self.borrowed_book
-        )
+
+        callback = Dispatcher(self.borrowed_book )
         job = ThreadedJob(
             "overdrive_libby_borrow_book",
             description,
@@ -446,12 +447,9 @@ class HoldsDialogMixin(BaseDialogMixin):
         self.hold_removed.emit(job.result)
         self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)
 
-    def borrowed_book_and_download(self, job):
-        # callback after book is borrowed
-        self.borrowed_book(job)
-        if (not job.failed) and job.result and hasattr(self, "download_loan"):
-            # this is actually from the loans tab
-            self.download_loan(job.result)
+        if (not job.failed) and job.result :   
+            self.postBorrowAction(job.result)   # this is actually from the loans tab
+
 
     def cancel_action_triggered(self, indices):
         msg = (

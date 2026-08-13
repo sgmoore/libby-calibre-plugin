@@ -59,7 +59,7 @@ class LibbyFormats(StringEnum):
     """
 
     AudioBookMP3 = "audiobook-mp3"
-    AudioBookOverDrive = "audiobook-overdrive"  # not used
+    AudioBookOverDrive = "audiobook-overdrive"  
     EBookEPubAdobe = "ebook-epub-adobe"
     EBookEPubOpen = "ebook-epub-open"
     EBookPDFAdobe = "ebook-pdf-adobe"
@@ -187,6 +187,11 @@ class LibbyClient(object):
                 if f["id"] in EBOOK_DOWNLOADABLE_FORMATS
             ]
         )
+    
+    @staticmethod
+    def is_format_downloadable(format_id) -> bool:
+        return format_id in EBOOK_DOWNLOADABLE_FORMATS
+  
 
     @staticmethod
     def is_downloadable_magazine_loan(book: Dict) -> bool:

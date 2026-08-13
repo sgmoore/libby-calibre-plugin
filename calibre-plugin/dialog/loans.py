@@ -9,15 +9,16 @@
 #
 # Now being maintained at https://github.com/sgmoore/libby-calibre-plugin
 #
-from typing import Dict
-
+from typing import Dict, Optional
+from os.path import expanduser, isdir
 from calibre.constants import DEBUG
-from calibre.gui2 import Dispatcher, open_url
+from calibre.gui2 import Dispatcher, open_url , error_dialog
 from calibre.gui2.dialogs.confirm_delete import confirm
 from calibre.gui2.ebook_download import show_download_info
 from calibre.gui2.threaded_jobs import ThreadedJob
 from polyglot.builtins import as_unicode
 from qt.core import (
+    # QAbstractItemView,
     QCheckBox,
     QCursor,
     QGridLayout,
@@ -37,9 +38,10 @@ from ..compat import (
     QHeaderView_ResizeMode_Stretch,
     _c,
 )
-from ..config import PREFS, PreferenceKeys, PreferenceTexts
+from ..config import PREFS, PreferenceKeys, PreferenceTexts, BorrowActions
 from ..ebook_download import CustomEbookDownload
 from ..libby import LibbyClient, LibbyFormats
+from ..overdrive import OverDriveClient
 from ..loan_actions import LibbyLoanRenew, LibbyLoanReturn
 from ..magazine_download import CustomMagazineDownload
 from ..models import (
@@ -48,10 +50,12 @@ from ..models import (
     get_media_title,
     truncate_for_display,
 )
-# from ..overdrive import OverDriveClient
+
 from ..utils import PluginImages
 from ..workers import LibbyFulfillLoanWorker
 from ..tools.CustomLogger import CustomLogger
+from ..tools.decorators import enforce_types
+from ..tools.error import Error
 
 from typing import TYPE_CHECKING
 
@@ -115,6 +119,7 @@ class LoansDialogMixin(BaseDialogMixin):
         self.loans_view = DefaultQTableView(
             self, model=self.loans_search_proxy_model, min_width=self.min_view_width
         )
+
         horizontal_header = self.loans_view.horizontalHeader()
         for col_index in range(self.loans_model.columnCount()):
             horizontal_header.setSectionResizeMode(
@@ -173,10 +178,12 @@ class LoansDialogMixin(BaseDialogMixin):
        
 
         # Download button
+
+        website = "overdrive.com" if PREFS[PreferenceKeys.PREFER_OVERDRIVE_WEBSITES] else "libbyapp.com"
         self.download_btn = DefaultQPushButton(
-            _c("Download"), self.resources[PluginImages.Download], self
+            _c(f"Open in {website}"), self.resources[PluginImages.Download], self
         )
-        self.download_btn.setToolTip(_("Download loan to calibre (opens browser for fulfillment)"))
+        self.download_btn.setToolTip(_(f"Open loan in {website} website"))
         self.download_btn.clicked.connect(self.download_btn_clicked)
         widget.layout.addWidget(
             self.download_btn,
@@ -239,6 +246,7 @@ class LoansDialogMixin(BaseDialogMixin):
         self.sync()
 
     def loans_view_selection_model_selectionchanged(self, selected, deselected):
+        self.updateDownloadButtonText()
         selection_model = self.loans_view.selectionModel()
         if not selection_model.hasSelection():
             return
@@ -260,6 +268,37 @@ class LoansDialogMixin(BaseDialogMixin):
                 + ")"
             )
         self.status_bar.showMessage(status_bar_msg, 3000)
+
+    def updateDownloadButtonText(self) :
+        # Default action is open in libbyapp   
+        # this is the only action that works on multiple rows, otherwise the button is disabled.
+
+        website = "overdrive.com" if PREFS[PreferenceKeys.PREFER_OVERDRIVE_WEBSITES] else "libbyapp.com"
+     
+        text = _c(f"Open in {website}")
+        tooltip = _(f"Open loan in {website} website")
+        selection_model = self.loans_view.selectionModel()
+
+        self.download_btn.setEnabled(True)
+
+        if selection_model.hasSelection():
+            rows = selection_model.selectedRows()
+            results = [self.getBorrowAction(row.data(Qt.UserRole)) for row in rows]
+
+            borrow_action = results[0] 
+            noOfResults = len(set(results))
+
+            if noOfResults == 1 :
+                if borrow_action == BorrowActions.BORROW_AND_DOWNLOAD :
+                    text = _("Download")
+                    tooltip = _("Download selected title")
+            else :
+                self.download_btn.setEnabled(False)
+
+        self.download_btn.setText(text)
+        self.download_btn.setToolTip(tooltip)                    
+
+        return
 
     def loans_view_context_menu_requested(self, pos):
         selection_model = self.loans_view.selectionModel()
@@ -371,40 +410,213 @@ class LoansDialogMixin(BaseDialogMixin):
         if selection_model.hasSelection():
             rows = selection_model.selectedRows()
             for row in reversed(rows):
-                if PREFS.get(PreferenceKeys.USE_BROWSER_DOWNLOAD, True):
-                    self.browser_assisted_download(row.data(Qt.UserRole))
-                else:
-                    self.openLibbyDownload(row.data(Qt.UserRole))
+                loan = row.data(Qt.UserRole)
+                self.download_or_read_or_play_or_open(loan)
 
-    def browser_assisted_download(self, loan):
+    def download_or_read_or_play_or_open(self, loan : Dict) :
+        borrow_action   = self.getBorrowAction(loan)       
+        format_id       = self.get_preferred_format(loan)
+        self.download_or_read_or_play(loan)
+        if borrow_action == BorrowActions.BORROW :
+            self.open_fulfilment_website(loan, format_id)
+
+
+    def download_or_read_or_play(self, loan : Dict) :
+        borrow_action   = self.getBorrowAction(loan)        
+        format_id       = self.get_preferred_format(loan)
+
+        if borrow_action == BorrowActions.BORROW_AND_DOWNLOAD :
+            self.download_loan(loan, format_id)
+        elif borrow_action == BorrowActions.BORROW_AND_OPEN :
+            self.open_fulfilment_website(loan, format_id)
+        elif borrow_action == BorrowActions.BORROW :
+            pass
+        else :
+            raise ValueError(f'Unexpected borrow_action {borrow_action}')
+           
+
+    def open_fulfilment_website(self, loan : Dict, format_id : Optional[str]) :
+        url = self.get_loan_fulfilment_url(loan, format_id)
+        
+        CustomLogger.log_simple_string(f"Opening {url}")
+        open_url(url)         
+
+    def automatically_create_empty_book(self,  loan):
+        try :
+           self.create_empty_book(self.create_empty_book_callback, self.loans_model , loan)
+        except Exception as e:
+          CustomLogger.logger.exception(e)
+
+    def create_empty_book_callback(self, job):
+        if job.failed:
+            try :
+                CustomLogger.logger.exception(job.exception)
+            except :  # noqa: E722
+                pass
+            self.unhandled_exception(job.exception, msg=_c("Failed to create calibre entry"))
+
+        self.gui.status_bar.show_message(job.description + " " + _c("finished"), 5000)      
+
+    def postBorrowAction(self, loan) :
+        if PREFS[PreferenceKeys.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING] :
+            borrow_action   = self.getBorrowAction(loan)  
+
+            # If we are going to download the book, then that process will create a non-empty book
+            # so there is no need to create an empty book. (Unless the download fails)
+            if borrow_action != BorrowActions.BORROW_AND_DOWNLOAD :
+                self.automatically_create_empty_book(loan)
+
+        self.download_or_read_or_play(loan)
+
+    def getBorrowAction(self, loan) :
+        downloadable = LibbyClient.is_downloadable_ebook_loan(loan)
+
+        return PREFS[PreferenceKeys.BORROW_ACTION_EBOOKS] if downloadable else PREFS[PreferenceKeys.BORROW_ACTION_OTHERS]
+
+    def download_failed(self, loan : Dict) :
+         if PREFS[PreferenceKeys.AUTOMATICALLY_CREATE_ENTRY_IN_CALIBRE_AFTER_BORROWING] :
+            self.automatically_create_empty_book(loan)
+  
+    def download_loan(self, loan: Dict, format_id : Optional[str]):
+
+        tags = self.get_calibre_tags(loan)
+
+        error_message = None 
+        if not format_id :
+            error_message = 'Can not download loan as the no formats found'
+            
+        if not LibbyClient.is_format_downloadable(format_id) :
+            error_message = f'Can not download loan as the selected format {format_id} is not downloadable '
+
+        if not LibbyClient.is_downloadable_ebook_loan(loan):
+            error_message = 'Only ebooks can be downloaded'
+
+        if error_message :
+            CustomLogger.log_simple_string(error_message)    
+            error_dialog(self, "Can not download loan", error_message, show=True )
+            self.download_failed(loan)
+            return 
+
+        show_download_info(get_media_title(loan), self)
+
+        if not format_id :
+            return 
+
+        return self.download_ebook(
+            loan,
+            format_id,
+            filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
+            tags=tags,
+        )
+
+
+    def download_ebook(self, loan: Dict, format_id: str, filename: str, tags=None):
+
+        self.browser_assisted_download(loan, format_id)
+
+        # if not tags:
+        #     tags = []
+        # card = self.loans_model.get_card(loan["cardId"])
+        # library = self.loans_model.get_library(self.loans_model.get_website_id(card))
+
+        # # We will handle the downloading of the files ourselves
+
+        # book_id, mi = self.match_existing_book(loan, library, format_id)
+        # if mi and book_id:
+        #     CustomLogger.logger.debug("Matched existing empty book: %s", mi.title)
+
+        # description = (
+        #     _(
+        #         "Downloading {format} for {book}".format(
+        #             format=LibbyClient.get_file_extension(format_id).upper(),
+        #             book=as_unicode(get_media_title(loan), errors="replace"),
+        #         )
+        #     )
+        #     if book_id and mi
+        #     else (
+        #         _c("Downloading %s")
+        #         % as_unicode(get_media_title(loan), errors="replace")
+        #     )
+        # )
+        # callback = Dispatcher(self.downloaded_loan)
+        # job = ThreadedJob(
+        #     "overdrive_libby_download_book",
+        #     description,
+        #     gui_ebook_download,
+        #     ( self.gui, self.client, loan, card, library, format_id, book_id, mi, filename, tags),
+        #     {},
+        #     callback,
+        #     max_concurrent_count=1,
+        #     killable=False,
+        # )
+        
+        # self.gui.job_manager.run_threaded_job(job)
+        # self.gui.status_bar.show_message(description, 3000)
+
+    @enforce_types
+    def get_loan_fulfilment_url(self, loan : Dict, format_id: Optional[str]) -> str :
+        if PREFS[PreferenceKeys.PREFER_OVERDRIVE_WEBSITES] :
+            card = self.loans_model.get_card(loan["cardId"])
+            library = self.loans_model.get_library(self.loans_model.get_website_id(card))       
+            library_key = library["preferredKey"]
+
+            # Loans still say they support audiobook-mp3 format, but they don't any more
+            # So we have to switch back to audiobook-overdrive (or loan["overDriveFormat"]["id"])
+            if format_id == LibbyFormats.AudioBookMP3 :
+                new_format = loan.get("overDriveFormat", None)
+                if new_format :
+                    new_format_id = new_format["id"]
+                    if new_format_id != format_id :
+                        CustomLogger.log_simple_string(f'get_loan_fulfilment_url uses format {new_format_id} rather than {format_id}')
+                        format_id = new_format_id
+
+            if format_id :
+                return OverDriveClient.generate_download_ebook_permalink(library_key, format_id, loan["id"] )
+            else :
+                return OverDriveClient.library_title_permalink(library_key, loan["id"])
+        else :
+            return f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
+            # What is the difference between this and LibbyClient.get_loan_fulfilment_details()
+            # which returns something like f'https://sentry.libbyapp.com/card/{card_id}/loan/{loan_id}/fulfill/{format_id}'
+            
+
+
+    def browser_assisted_download(self, loan , format_id: str,):
+        # do actual downloading of the loan
+
+        Error.RaiseIfNot( format_id , "format_id must not be blank or None")
+
+        CustomLogger.log_and_format(loan, "Attempted download")
+
         downloads_folder = PREFS.get(PreferenceKeys.DOWNLOADS_FOLDER, "")
+        error_message = None
+        details = None
         if not downloads_folder:
-            from calibre.gui2 import error_dialog
-            error_dialog(
-                self,
-                _("Downloads Folder Not Set"),
-                _("Please configure your Downloads folder in the plugin settings (General tab) to use browser-assisted downloading."),
-                show=True,
-            )
-            self.openLibbyDownload(loan)
+            error_message = _("Downloads Folder Not Set"),
+            details = _("Please configure your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading."),
+        else :        
+            downloads_folder = expanduser(downloads_folder)
+    
+            if not isdir(downloads_folder) :
+               error_message = _("Specified Downloads Folder does not exist"),
+               details = _("Please correct your Downloads folder in the plugin settings (Loans tab) to use browser-assisted downloading."),
+        
+        if error_message :
+            error_dialog(self, error_message, details, show=True )
+            self.open_fulfilment_website(loan, format_id)
             return
+        
+
+
+        Error.RaiseIfNot(downloads_folder , "downloads_folder must not be blank or None")
 
         from ..tools.WatchForFile import wait_for_file_qt
         
-        try:
-            format_id = LibbyClient.get_loan_format(
-                loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
-            )
-        except ValueError:
-            format_id = LibbyClient.get_locked_in_format(loan)
+        expected_ext = "." + LibbyClient.get_file_extension(format_id) 
             
-        expected_ext = LibbyClient.get_file_extension(format_id) if format_id else "acsm"
-        if not expected_ext.startswith("."):
-            expected_ext = f".{expected_ext}"
-            
-        libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
-        CustomLogger.log_simple_string(f"Opening {libbyurl} and watching {downloads_folder} for {expected_ext}")
-        open_url(libbyurl)
+        url = self.get_loan_fulfilment_url(loan, format_id)
+        CustomLogger.log_simple_string(f"Opening {url} and watching {downloads_folder} for {expected_ext}")
+        open_url(url)
 
         from qt.core import QProgressDialog, Qt
         
@@ -424,15 +636,11 @@ class LoansDialogMixin(BaseDialogMixin):
             CustomLogger.log_simple_string("Download timed out or was canceled.")
 
     def import_downloaded_file(self, loan, format_id, file_path):
-        from ..ebook_download import CustomEbookDownload
-        from ..magazine_download import CustomMagazineDownload
         
-        # Figure out the tags
+        tags = self.get_calibre_tags(loan)
         if LibbyClient.is_downloadable_magazine_loan(loan):
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
             downloader = CustomMagazineDownload()
         else:
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
             downloader = CustomEbookDownload()
             
         card = self.loans_model.get_card(loan["cardId"])
@@ -447,7 +655,6 @@ class LoansDialogMixin(BaseDialogMixin):
         
         callback = Dispatcher(self.downloaded_loan)
         
-        from calibre.gui2.threaded_jobs import ThreadedJob
         job = ThreadedJob(
             "overdrive_libby_import",
             description,
@@ -460,131 +667,18 @@ class LoansDialogMixin(BaseDialogMixin):
         )
         self.gui.job_manager.run_threaded_job(job)
         self.gui.status_bar.show_message(description, 3000)
+      
 
     def _do_import_job(self, downloader, gui, loan, card, library, format_id, file_path, book_id, tags, metadata, log=None, abort=None, notifications=None):
-        handled_asynchronously = False
         try:
-            handled_asynchronously = downloader.add(
-                gui,
-                loan,
-                card,
-                library,
-                format_id,
-                file_path,
-                book_id,
-                tags,
-                metadata,
-            )
+            downloader.add(gui, loan, card, library, format_id, file_path, book_id, tags, metadata)
         finally:
-            if not handled_asynchronously:
-                try:
-                    file_path.unlink(missing_ok=True)
-                except Exception as e:
-                    CustomLogger.logger.warning(f"Could not remove temp file: {e}")
+            try:
+                file_path.unlink(missing_ok=True)
+            except Exception as e:
+                CustomLogger.logger.warning(f"Could not remove temp file {file_path} : {e} ")
         return loan
 
-    def openLibbyDownload(self, loan) :
-        libbyurl = f'https://libbyapp.com/shelf/loans/{loan["cardId"]}-{loan["id"]}/fulfill'
-        CustomLogger.log_simple_string(f"Opening {libbyurl}")
-        open_url(libbyurl)         
-       
-    def old_download_loan(self, loan: Dict):
-        # do actual downloading of the loan
-
-        CustomLogger.log_and_format(loan, "Attempted download")
-        try:
-            format_id = LibbyClient.get_loan_format(
-                loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
-            )
-        except ValueError:
-            # kindle
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
-            format_id = LibbyClient.get_locked_in_format(loan)
-            if format_id:
-                # create empty book
-                return self.download_empty_loan(self, format_id, tags)
-            
-        CustomLogger.log_simple_string(f"Format_id {format_id}")
-
-        if LibbyClient.is_downloadable_audiobook_loan(loan):
-            return self.download_empty_loan(self, loan, format_id)
-
-        if LibbyClient.is_downloadable_ebook_loan(loan):
-            show_download_info(get_media_title(loan), self)
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
-
-            return self.download_ebook(
-                loan,
-                format_id,
-                filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
-                tags=tags,
-            )
-
-        if LibbyClient.is_downloadable_magazine_loan(loan):
-            show_download_info(get_media_title(loan), self)
-            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
-            return self.download_magazine(
-                loan,
-                format_id,
-                filename=f'{loan["id"]}.{LibbyClient.get_file_extension(format_id)}',
-                tags=tags,
-            )
-
-        return self.download_empty_loan(loan, format_id)
-
-    def download_empty_loan(self, loan, format_id, tags=None):
-        self.download_empty_book(self.downloaded_loan, self.loans_model, loan, format_id , tags)
-  
-
-    def download_ebook(self, loan: Dict, format_id: str, filename: str, tags=None):
-        if not tags:
-            tags = []
-        card = self.loans_model.get_card(loan["cardId"])
-        library = self.loans_model.get_library(self.loans_model.get_website_id(card))
-
-        # We will handle the downloading of the files ourselves
-
-        book_id, mi = self.match_existing_book(loan, library, format_id)
-        if mi and book_id:
-            CustomLogger.logger.debug("Matched existing empty book: %s", mi.title)
-
-        description = (
-            _(
-                "Downloading {format} for {book}".format(
-                    format=LibbyClient.get_file_extension(format_id).upper(),
-                    book=as_unicode(get_media_title(loan), errors="replace"),
-                )
-            )
-            if book_id and mi
-            else (
-                _c("Downloading %s")
-                % as_unicode(get_media_title(loan), errors="replace")
-            )
-        )
-        callback = Dispatcher(self.downloaded_loan)
-        job = ThreadedJob(
-            "overdrive_libby_download_book",
-            description,
-            gui_ebook_download,
-            (
-                self.gui,
-                self.client,
-                loan,
-                card,
-                library,
-                format_id,
-                book_id,
-                mi,
-                filename,
-                tags,
-            ),
-            {},
-            callback,
-            max_concurrent_count=1,
-            killable=False,
-        )
-        self.gui.job_manager.run_threaded_job(job)
-        self.gui.status_bar.show_message(description, 3000)
     def download_magazine(self, loan: Dict, format_id: str, filename: str, tags=None):
         if not tags:
             tags = []
@@ -683,6 +777,10 @@ class LoansDialogMixin(BaseDialogMixin):
 
     def downloaded_loan(self, job):
         if job.failed:
+            try :
+                CustomLogger.logger.exception(job.exception)
+            except :  # noqa: E722
+                pass
             # self.gui.job_exception(job, dialog_title=_c("Failed to download e-book"))
             self.unhandled_exception(job.exception, msg=_c("Failed to download e-book"))
 

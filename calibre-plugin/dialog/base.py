@@ -35,7 +35,7 @@ from qt.core import (
     QItemSelectionModel,
     QLabel,
     QLayout,
-    QMenu,
+    # QMenu,
     QPalette,
     QPixmap,
     QPixmapCache,
@@ -51,9 +51,9 @@ from qt.core import (
 )
 
 from .widgets import ClickableQLabel, CustomLoadingOverlay, DefaultQPushButton
-from .. import DEMO_MODE 
-from ..compat import QToolButton_ToolButtonPopupMode_DelayedPopup, _c, ngettext_c
-from ..config import BorrowActions, PREFS, PreferenceKeys, SearchMode
+from .. import DEMO_MODE
+from ..compat import _c, ngettext_c
+from ..config import PREFS, PreferenceKeys, BorrowActions, SearchMode
 from ..empty_download import EmptyBookDownload
 from ..hold_actions import LibbyHoldCreate
 from ..libby import LibbyClient, LibbyMediaTypes
@@ -77,10 +77,12 @@ from ..utils import (
     SimpleCache,
     generate_od_identifier,
     rating_to_stars,
-    svg_to_pixmap,
+    svg_to_pixmap,    
 )
 from ..workers import OverDriveMediaWorker, SyncDataWorker
 from ..tools.CustomLogger import CustomLogger
+from ..tools.decorators import enforce_types
+from ..tools.error import Error
 
 from typing import TYPE_CHECKING
 
@@ -123,7 +125,6 @@ class BaseDialogMixin(QDialog):
     Base mixin class for the main QDialog
     """
 
-    last_borrow_action_changed = pyqtSignal(str)
     search_mode_changed = pyqtSignal(str)
     hide_title_already_in_lib_pref_changed = pyqtSignal(bool)
     sync_starting = pyqtSignal()
@@ -500,91 +501,43 @@ class BaseDialogMixin(QDialog):
         :param borrow_function:
         :return:
         """
-        borrow_action_default_is_borrow = PREFS[
-            PreferenceKeys.LAST_BORROW_ACTION
-        ] == BorrowActions.BORROW or not hasattr(self, "download_loan")
 
         borrow_btn = BorrowAndDownloadButton(
-            _("Borrow")
-            if borrow_action_default_is_borrow
-            else _("Borrow and Download"),
+            _("Borrow"),
             self.resources[PluginImages.Add],
-            lambda: borrow_function(do_download=not borrow_action_default_is_borrow),
+            lambda: borrow_function(),
             self,
         )
-        borrow_btn.setToolTip(
-            _("Borrow selected title")
-            if borrow_action_default_is_borrow
-            else _("Borrow and download selected title")
-        )
-        if hasattr(self, "download_loan"):
-            borrow_btn.setPopupMode(QToolButton_ToolButtonPopupMode_DelayedPopup)
-            borrow_btn_menu = QMenu(borrow_btn)
-            borrow_btn_menu_bnd_action = borrow_btn_menu.addAction(
-                _("Borrow and Download")
-                if borrow_action_default_is_borrow
-                else _("Borrow")
-            )
-            borrow_btn_menu_bnd_action.triggered.connect(
-                lambda: borrow_function(do_download=borrow_action_default_is_borrow)
-            )
-            borrow_btn_menu.borrow_action = borrow_btn_menu_bnd_action
-            borrow_btn.borrow_menu = borrow_btn_menu
-            borrow_btn.setMenu(borrow_btn_menu)
+        borrow_btn.setToolTip(_("Borrow selected title"))
         return borrow_btn
 
-    def rebind_borrow_btn(self, borrow_action: str, borrow_btn, borrow_function):
-        """
-        Shared func for rebinding and toggling the borrow button in the Holds and Mgazines tabs.
+     
+        
 
-        :param borrow_action:
-        :param borrow_btn:
-        :param borrow_function:
-        :return:
-        """
-        borrow_action_default_is_borrow = (
-            borrow_action == BorrowActions.BORROW or not hasattr(self, "download_loan")
-        )
-        borrow_btn.setText(
-            _("Borrow") if borrow_action_default_is_borrow else _("Borrow and Download")
-        )
-        borrow_btn.setToolTip(
-            _("Borrow selected title")
-            if borrow_action_default_is_borrow
-            else _("Borrow and download selected title")
-        )
-        borrow_btn.set_action(
-            lambda: borrow_function(do_download=not borrow_action_default_is_borrow)
-        )
-        if hasattr(borrow_btn, "borrow_menu") and hasattr(
-            borrow_btn.borrow_menu, "borrow_action"
-        ):
-            borrow_btn.borrow_menu.borrow_action.setText(
-                _("Borrow and Download")
-                if borrow_action_default_is_borrow
-                else _("Borrow")
-            )
-            try:
-                borrow_btn.borrow_menu.borrow_action.triggered.disconnect()
-            except TypeError:
-                pass
-            borrow_btn.borrow_menu.borrow_action.triggered.connect(
-                lambda: borrow_function(do_download=borrow_action_default_is_borrow)
-            )
 
-    def rebind_borrow_buttons(self, do_download=False):
-        """
-        Calls the known rebind borrow button functions from tabs
+  
+    @enforce_types
+    def update_borrow_btn_text( self, media : Optional[Dict] , borrow_btn)  -> None:
+        if media is None :
+            return 
+        
+        downloadable = LibbyClient.is_downloadable_ebook_loan(media)
+        audioBook    = LibbyClient.is_downloadable_audiobook_loan(media)
+        has_dl_attr  = hasattr(self, "download_loan")
 
-        :param do_download:
-        :return:
-        """
-        borrow_action = (
-            BorrowActions.BORROW_AND_DOWNLOAD if do_download else BorrowActions.BORROW
-        )
-        if PREFS[PreferenceKeys.LAST_BORROW_ACTION] != borrow_action:
-            PREFS[PreferenceKeys.LAST_BORROW_ACTION] = borrow_action
-            self.last_borrow_action_changed.emit(borrow_action)
+        borrow_action = PREFS[PreferenceKeys.BORROW_ACTION_EBOOKS] if downloadable else PREFS[PreferenceKeys.BORROW_ACTION_OTHERS]
+
+        text = _("Borrow")
+        tooltip =  _("Borrow selected title")
+        if has_dl_attr and borrow_action == BorrowActions.BORROW_AND_DOWNLOAD :
+            text = _("Borrow and Download")
+            tooltip = _("Borrow and download selected title")
+        if has_dl_attr and borrow_action == BorrowActions.BORROW_AND_OPEN :
+            text = _("Borrow and Open")
+            tooltip = _("Borrow and Play in browser") if audioBook else _("Borrow and Read in browser")
+
+        borrow_btn.setText(text)
+        borrow_btn.setToolTip(tooltip)
 
     def display_debug(self, text, data):
         """
@@ -678,6 +631,7 @@ class BaseDialogMixin(QDialog):
             else:
                 msg = "<b>%s</b>" % err.__class__.__name__
 
+            print(f'SM- {msg} :: {err} ::')
             if type(err) in (
                 LibbyConnectionError,
                 OverDriveConnectionError,
@@ -697,6 +651,10 @@ class BaseDialogMixin(QDialog):
                 )
             elif isinstance(err, LibbyClientError):
                 msg += f"<p>{err.msg}</p>"
+            elif err :
+                # Is there any reason why we would want to hide the exception message
+                msg += f"<p>{err}</p>"
+
 
             return error_dialog(
                 self, _c("Unhandled exception"), msg, det_msg=fe, show=True
@@ -759,6 +717,7 @@ class BaseDialogMixin(QDialog):
             search_conditions = self.generate_search_conditions(
                 book, library, format_id
             )
+            CustomLogger.log_and_format(search_conditions , "Search Conditions")
             if search_conditions:
                 # search for existing empty book only if there is at least 1 search condition
                 search_query = " or ".join(search_conditions)
@@ -798,12 +757,37 @@ class BaseDialogMixin(QDialog):
                     # we still haven't matched one using identifiers, then just take the first one
                     book_id = book_ids[0] if book_ids else 0
                 mi = self.db.get_metadata(book_id) if book_id else None
+        
+        CustomLogger.log_simple_string(f'Match existing book returns book_id = {book_id}')
         return book_id, mi
     
     def pickFirstCard(self, book, model):
         for k, site in book.get("siteAvailabilities", {}).items():
             return next(iter(model.get_cards_for_library_key(k)),None,)       
-        
+
+    @enforce_types
+    def get_preferred_format(self, loan: Dict) -> Optional[str] :   
+        try:
+            return LibbyClient.get_loan_format(loan, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS])
+        except ValueError:
+            # kindle
+            return LibbyClient.get_locked_in_format(loan)
+   
+    @enforce_types
+    def get_calibre_tags(self, loan : Dict) -> List[str] :
+
+        if LibbyClient.is_downloadable_magazine_loan(loan):
+            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
+        else:
+            tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
+        return tags
+            
+
+    def create_empty_book(self, callBack, model : LibbyModel , book : Dict) :
+        format_id = self.get_preferred_format(book)
+        tags = self.get_calibre_tags(book)
+
+        self.download_empty_book(callBack, model, book, format_id , tags)
 
     def download_empty_book(self, callBack, model : LibbyModel, book, format_id, tags=None):
         if not tags:
@@ -813,6 +797,8 @@ class BaseDialogMixin(QDialog):
         CustomLogger.log_and_format(book, "book")
         CustomLogger.log_and_format(format_id, "format_id")
         CustomLogger.log_and_format(tags, "tags")
+
+        Error.RaiseIfNot(book, "book is required")
 
         # If the book comes from a search, it will not have a cardId, so we pick a card for the first library 
         if "cardId" in book :
@@ -849,6 +835,7 @@ class BaseDialogMixin(QDialog):
             callback,
             max_concurrent_count=1,
             killable=False,
+
         )
         self.gui.job_manager.run_threaded_job(job)
         self.gui.status_bar.show_message(description, 3000)
@@ -859,19 +846,7 @@ class BaseDialogMixin(QDialog):
             rows = selection_model.selectedRows()
             for row in reversed(rows):
                 book = row.data(Qt.UserRole)
-                try:
-                    format_id = LibbyClient.get_loan_format(
-                        book, prefer_open_format=PREFS[PreferenceKeys.PREFER_OPEN_FORMATS]
-                    )
-                except ValueError:
-                    # kindle
-                    format_id = LibbyClient.get_locked_in_format(book)
-                    
-                if LibbyClient.is_downloadable_magazine_loan(book):
-                    tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_MAGAZINES].split(",")]
-                else :
-                    tags = [t.strip() for t in PREFS[PreferenceKeys.TAG_EBOOKS].split(",")]
-                self.download_empty_book(callBack, libby_model , book, format_id, tags)
+                self.create_empty_book(callBack, libby_model , book)
 
 
 class BookPreviewDialog(QDialog):

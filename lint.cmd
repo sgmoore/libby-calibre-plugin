@@ -1,6 +1,6 @@
 @echo off
 
-rem example of batch file to run ruff and mypy for both python 3.9 and 3.13  
+rem example of batch file to run ruff and mypy for both python 3.8 and 3.13  
 
 set "ORIGINAL_PATH=%PATH%"
 pushd %CD%
@@ -22,3 +22,4 @@ mypy --config-file .mypy311.ini --package calibre-plugin
 
 popd
 set "PATH=%ORIGINAL_PATH%"
+
